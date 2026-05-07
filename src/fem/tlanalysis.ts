@@ -21,7 +21,7 @@ import { buildMicrostripPslg, type GeometryOptions } from './geometry';
 import { meshFromPslg, type MeshOptions } from './mesh';
 import { cloneCsr } from './sparse';
 import { solveCgJacobi } from './solver';
-import { Marker, type MicrostripParams, RegionAttr } from '../types';
+import { Marker, type Mesh, type MicrostripParams, RegionAttr } from '../types';
 
 /** Z₀ [Ω] from the per-length capacitances C [F/m] and C₀ [F/m]. */
 export function characteristicImpedance(c: number, c0: number): number {
@@ -58,6 +58,14 @@ export interface MicrostripSolveResult {
   c0: number;
   triangleCount: number;
   cgIterations: { withDielectric: number; vacuum: number };
+  /** Triangulated cross-section mesh (vertices, triangles, markers). */
+  mesh: Mesh;
+  /** Nodal potential φ for the dielectric solve (length = numVertices). */
+  phi: Float64Array;
+  /** Nodal potential φ for the vacuum solve. */
+  phiVacuum: Float64Array;
+  /** Outer bounding box of the computational domain. */
+  bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
 }
 
 /**
@@ -68,7 +76,7 @@ export function solveMicrostrip(
   params: MicrostripParams,
   options: MicrostripSolveOptions = {},
 ): MicrostripSolveResult {
-  const { pslg } = buildMicrostripPslg(params, options.geometry);
+  const { pslg, bounds } = buildMicrostripPslg(params, options.geometry);
   const mesh = meshFromPslg(pslg, options.mesh);
   const tol = options.cgTolerance ?? 1e-10;
 
@@ -107,5 +115,9 @@ export function solveMicrostrip(
     c0,
     triangleCount: mesh.triangleCount,
     cgIterations: { withDielectric: solC.iterations, vacuum: solV.iterations },
+    mesh,
+    phi: solC.x,
+    phiVacuum: solV.x,
+    bounds,
   };
 }
