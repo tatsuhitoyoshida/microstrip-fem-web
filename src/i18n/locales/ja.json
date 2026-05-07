@@ -1,0 +1,69 @@
+{
+  "app": {
+    "title": "マイクロストリップ FEM",
+    "brand": "Photonic Edge"
+  },
+  "form": {
+    "title": "パラメータ",
+    "unitsLegend": "長さの単位",
+    "width": "線路幅 W [{{unit}}]",
+    "height": "基板厚 h [{{unit}}]",
+    "thickness": "導体厚 t [{{unit}}]",
+    "epsilonR": "比誘電率 εr",
+    "targetZ0": "目標 Z₀ [Ω]",
+    "calculate": "計算",
+    "findW": "目標 Z₀ から W を逆算",
+    "findWTooltip": "FEM で Z₀(W) の二分法探索"
+  },
+  "results": {
+    "title": "結果",
+    "loading": "FEM 計算中…",
+    "empty": "パラメータを設定して「計算」を押してください。",
+    "errorPrefix": "エラー: {{message}}",
+    "z0": "Z₀",
+    "epsilonEff": "ε_eff",
+    "solvedAt": "解いた W",
+    "optimalW": "最適 W(二分法)",
+    "capacitance": "C",
+    "vacuumCapacitance": "C₀(真空)",
+    "diagnostics": "メッシュ: {{triangles}} 三角形 · CG 反復: {{withDielectric}}(誘電体) / {{vacuum}}(真空)"
+  },
+  "comparison": {
+    "title": "比較",
+    "empty": "まだ結果がありません。",
+    "method": "計算法",
+    "z0": "Z₀ [Ω]",
+    "epsilonEff": "ε_eff",
+    "delta": "Δ Z₀ vs FEM",
+    "fem": "FEM",
+    "hammerstad": "Hammerstad–Jensen",
+    "wheeler": "Wheeler / Pozar"
+  },
+  "plot": {
+    "title": "断面 · |E| ヒートマップ",
+    "xAxis": "x [mm]",
+    "yAxis": "y [mm]",
+    "colorbar": "|E| [V/長さ]",
+    "empty": "まだメッシュがありません。",
+    "conductor": "導体"
+  },
+  "about": {
+    "toggleShow": "このツールについて",
+    "toggleHide": "閉じる",
+    "title": "このツールについて",
+    "whyFemTitle": "なぜ FEM か",
+    "whyFemBody": "既存の Web 計算ツールは Hammerstad–Jensen 式や Wheeler 式といった closed-form 近似に依存しており、導体厚が厚い、h/W 比が小さい、高周波域などで精度が劣化する。本ツールはブラウザ内で 2D quasi-static FEM を実行し、これらの近似式が破綻する領域でも厳密な Z₀ を提供する。",
+    "scopeTitle": "v0.1 スコープ",
+    "scope1": "シングルエンドのマイクロストリップのみ(差動 / CPW / ストリップラインは未対応)",
+    "scope2": "quasi-static・無損失(tan δ・表皮効果・分散は未実装)",
+    "scope3": "単層基板のみ",
+    "licenseTitle": "ライセンスと公開先",
+    "licenseBody": "MIT ライセンス。ソースは <github>GitHub</github>。",
+    "credit": "<pe>Photonic Edge Inc.</pe> が開発・公開"
+  },
+  "language": {
+    "switcher": "言語",
+    "ja": "日本語",
+    "en": "English"
+  }
+}

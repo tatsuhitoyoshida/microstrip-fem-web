@@ -4,6 +4,7 @@
  * the FEM column, since FEM is the "rigorous" baseline of this tool.
  */
 
+import { useTranslation } from 'react-i18next';
 import type { CalcResult } from '../hooks/useMicrostripCalc';
 
 export interface ComparisonTableProps {
@@ -11,33 +12,35 @@ export interface ComparisonTableProps {
 }
 
 interface Row {
-  method: string;
+  label: string;
   z0: number;
   epsilonEff: number;
   z0DeltaPct: number | null;
 }
 
 export function ComparisonTable({ result }: ComparisonTableProps): React.ReactElement {
+  const { t } = useTranslation();
+
   if (!result) {
     return (
       <section className="comparison-table">
-        <h2>Comparison</h2>
-        <p className="hint">No results yet.</p>
+        <h2>{t('comparison.title')}</h2>
+        <p className="hint">{t('comparison.empty')}</p>
       </section>
     );
   }
 
   const { fem, hammerstad, wheeler } = result;
   const rows: Row[] = [
-    { method: 'FEM', z0: fem.z0, epsilonEff: fem.epsilonEff, z0DeltaPct: null },
+    { label: t('comparison.fem'), z0: fem.z0, epsilonEff: fem.epsilonEff, z0DeltaPct: null },
     {
-      method: 'Hammerstad–Jensen',
+      label: t('comparison.hammerstad'),
       z0: hammerstad.z0,
       epsilonEff: hammerstad.epsilonEff,
       z0DeltaPct: ((hammerstad.z0 - fem.z0) / fem.z0) * 100,
     },
     {
-      method: 'Wheeler / Pozar',
+      label: t('comparison.wheeler'),
       z0: wheeler.z0,
       epsilonEff: wheeler.epsilonEff,
       z0DeltaPct: ((wheeler.z0 - fem.z0) / fem.z0) * 100,
@@ -46,20 +49,20 @@ export function ComparisonTable({ result }: ComparisonTableProps): React.ReactEl
 
   return (
     <section className="comparison-table">
-      <h2>Comparison</h2>
+      <h2>{t('comparison.title')}</h2>
       <table>
         <thead>
           <tr>
-            <th>Method</th>
-            <th>Z₀ [Ω]</th>
-            <th>ε_eff</th>
-            <th>Δ Z₀ vs FEM</th>
+            <th>{t('comparison.method')}</th>
+            <th>{t('comparison.z0')}</th>
+            <th>{t('comparison.epsilonEff')}</th>
+            <th>{t('comparison.delta')}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.method}>
-              <td>{r.method}</td>
+            <tr key={r.label}>
+              <td>{r.label}</td>
               <td className="numeric">{r.z0.toFixed(3)}</td>
               <td className="numeric">{r.epsilonEff.toFixed(3)}</td>
               <td className="numeric">

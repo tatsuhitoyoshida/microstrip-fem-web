@@ -8,11 +8,18 @@
 
 .app__header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding: 1rem 2rem;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-panel);
+}
+
+.app__header-titles {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
 }
 
 .app__header h1 {
@@ -22,6 +29,31 @@
 .app__brand {
   font-size: 0.875rem;
   color: var(--color-text-muted);
+}
+
+.language-switcher {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.language-switcher__btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 0;
+  background: var(--color-bg-panel);
+  color: var(--color-text-muted);
+}
+
+.language-switcher__btn--active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.language-switcher__btn--active:hover:not(:disabled) {
+  background: var(--color-accent-hover);
 }
 
 .app__main {

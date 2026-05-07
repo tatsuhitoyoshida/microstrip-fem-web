@@ -38,9 +38,12 @@ export interface BuiltGeometry {
   bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
 }
 
-/** Default ratios used when no per-region area constraint is supplied. */
-const DEFAULT_SUBSTRATE_TRIANGLE_TARGET = 1500;
-const DEFAULT_AIR_TRIANGLE_TARGET = 3500;
+/** Default ratios used when no per-region area constraint is supplied.
+ *  Tuned to a roughly 9 k-triangle mesh on the standard FR-4 case — coarse
+ *  enough to keep the FEM under ~250 ms per solve in the browser, fine
+ *  enough that the |E| heatmap reads cleanly at typical viewport sizes. */
+const DEFAULT_SUBSTRATE_TRIANGLE_TARGET = 3000;
+const DEFAULT_AIR_TRIANGLE_TARGET = 6000;
 
 export function buildMicrostripPslg(
   params: MicrostripParams,

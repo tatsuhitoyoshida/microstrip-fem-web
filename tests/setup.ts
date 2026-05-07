@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom/vitest';
+// Initialise i18next so component smoke tests don't fall through to raw keys.
+// English is selected via the navigator detector (jsdom defaults to en-US).
+import '../src/i18n';
 
 // Triangle-wasm's Emscripten loader prefers WebAssembly.instantiateStreaming
 // when available, but in Node 22+ that defers to global fetch — and our

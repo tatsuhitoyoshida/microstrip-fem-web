@@ -3,6 +3,7 @@
  * triggered a bisection), and a small mesh-quality footer.
  */
 
+import { useTranslation } from 'react-i18next';
 import type { CalcResult } from '../hooks/useMicrostripCalc';
 import { type LengthUnit, formatLength } from '../lib/units';
 
@@ -19,11 +20,13 @@ export function ResultsPanel({
   error,
   unit,
 }: ResultsPanelProps): React.ReactElement {
+  const { t } = useTranslation();
+
   if (error) {
     return (
       <section className="results-panel results-panel--error">
-        <h2>Results</h2>
-        <p className="error">Error: {error}</p>
+        <h2>{t('results.title')}</h2>
+        <p className="error">{t('results.errorPrefix', { message: error })}</p>
       </section>
     );
   }
@@ -31,8 +34,8 @@ export function ResultsPanel({
   if (isLoading && !result) {
     return (
       <section className="results-panel">
-        <h2>Results</h2>
-        <p className="loading">Solving FEM…</p>
+        <h2>{t('results.title')}</h2>
+        <p className="loading">{t('results.loading')}</p>
       </section>
     );
   }
@@ -40,8 +43,8 @@ export function ResultsPanel({
   if (!result) {
     return (
       <section className="results-panel">
-        <h2>Results</h2>
-        <p className="hint">Set parameters and press Calculate.</p>
+        <h2>{t('results.title')}</h2>
+        <p className="hint">{t('results.empty')}</p>
       </section>
     );
   }
@@ -50,34 +53,37 @@ export function ResultsPanel({
 
   return (
     <section className={`results-panel${isLoading ? ' results-panel--reloading' : ''}`}>
-      <h2>Results</h2>
+      <h2>{t('results.title')}</h2>
       <dl className="results-panel__numbers">
-        <dt>Z₀</dt>
+        <dt>{t('results.z0')}</dt>
         <dd>{fem.z0.toFixed(3)} Ω</dd>
 
-        <dt>ε_eff</dt>
+        <dt>{t('results.epsilonEff')}</dt>
         <dd>{fem.epsilonEff.toFixed(3)}</dd>
 
-        <dt>Solved at W</dt>
+        <dt>{t('results.solvedAt')}</dt>
         <dd>{formatLength(paramsUsed.width, unit)}</dd>
 
         {optimalW !== undefined && (
           <>
-            <dt>Optimal W (bisection)</dt>
+            <dt>{t('results.optimalW')}</dt>
             <dd>{formatLength(optimalW, unit)}</dd>
           </>
         )}
 
-        <dt>C</dt>
+        <dt>{t('results.capacitance')}</dt>
         <dd>{(fem.c * 1e12).toFixed(3)} pF/m</dd>
 
-        <dt>C₀ (vacuum)</dt>
+        <dt>{t('results.vacuumCapacitance')}</dt>
         <dd>{(fem.c0 * 1e12).toFixed(3)} pF/m</dd>
       </dl>
 
       <p className="results-panel__diagnostics">
-        Mesh: {fem.triangleCount.toLocaleString()} triangles · CG iterations:{' '}
-        {fem.cgIterations.withDielectric} (dielectric) / {fem.cgIterations.vacuum} (vacuum)
+        {t('results.diagnostics', {
+          triangles: fem.triangleCount.toLocaleString(),
+          withDielectric: fem.cgIterations.withDielectric,
+          vacuum: fem.cgIterations.vacuum,
+        })}
       </p>
     </section>
   );

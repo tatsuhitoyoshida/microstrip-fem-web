@@ -28,9 +28,12 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "i18next": "^26.0.10",
+    "i18next-browser-languagedetector": "^8.2.1",
     "plotly.js-dist-min": "^3.5.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-i18next": "^17.0.7",
     "triangle-wasm": "^1.0.0"
   },
   "devDependencies": {

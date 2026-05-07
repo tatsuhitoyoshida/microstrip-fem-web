@@ -1,0 +1,69 @@
+{
+  "app": {
+    "title": "Microstrip FEM",
+    "brand": "Photonic Edge"
+  },
+  "form": {
+    "title": "Parameters",
+    "unitsLegend": "Length units",
+    "width": "Trace width W [{{unit}}]",
+    "height": "Substrate height h [{{unit}}]",
+    "thickness": "Conductor thickness t [{{unit}}]",
+    "epsilonR": "Relative permittivity εr",
+    "targetZ0": "Target Z₀ [Ω]",
+    "calculate": "Calculate",
+    "findW": "Find W for target Z₀",
+    "findWTooltip": "Bisection on Z₀(W) using FEM"
+  },
+  "results": {
+    "title": "Results",
+    "loading": "Solving FEM…",
+    "empty": "Set parameters and press Calculate.",
+    "errorPrefix": "Error: {{message}}",
+    "z0": "Z₀",
+    "epsilonEff": "ε_eff",
+    "solvedAt": "Solved at W",
+    "optimalW": "Optimal W (bisection)",
+    "capacitance": "C",
+    "vacuumCapacitance": "C₀ (vacuum)",
+    "diagnostics": "Mesh: {{triangles}} triangles · CG iterations: {{withDielectric}} (dielectric) / {{vacuum}} (vacuum)"
+  },
+  "comparison": {
+    "title": "Comparison",
+    "empty": "No results yet.",
+    "method": "Method",
+    "z0": "Z₀ [Ω]",
+    "epsilonEff": "ε_eff",
+    "delta": "Δ Z₀ vs FEM",
+    "fem": "FEM",
+    "hammerstad": "Hammerstad–Jensen",
+    "wheeler": "Wheeler / Pozar"
+  },
+  "plot": {
+    "title": "Cross-section · |E| heatmap",
+    "xAxis": "x [mm]",
+    "yAxis": "y [mm]",
+    "colorbar": "|E| [V/length]",
+    "empty": "No mesh yet.",
+    "conductor": "Conductor"
+  },
+  "about": {
+    "toggleShow": "About this tool",
+    "toggleHide": "Hide",
+    "title": "About this tool",
+    "whyFemTitle": "Why FEM?",
+    "whyFemBody": "Most online microstrip calculators rely on Hammerstad–Jensen or Wheeler closed-form approximations. Those formulas drift as conductor thickness grows, the h/W ratio shrinks, or frequency rises. This tool runs a true 2-D quasi-static finite-element method (FEM) directly in the browser, giving rigorous Z₀ values that hold up where the closed-form expressions break down.",
+    "scopeTitle": "v0.1 scope",
+    "scope1": "Single-ended microstrip only (no differential / CPW / stripline)",
+    "scope2": "Quasi-static, lossless (no tan δ, skin effect, or dispersion yet)",
+    "scope3": "Single-layer substrate",
+    "licenseTitle": "License & source",
+    "licenseBody": "MIT licensed. Source on <github>GitHub</github>.",
+    "credit": "Built by <pe>Photonic Edge Inc.</pe>"
+  },
+  "language": {
+    "switcher": "Language",
+    "ja": "日本語",
+    "en": "English"
+  }
+}

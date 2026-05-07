@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import Plotly from 'plotly.js-dist-min';
 import type { CalcResult } from '../hooks/useMicrostripCalc';
 
@@ -84,7 +85,12 @@ function computeTriangleStats(result: CalcResult): TriangleStats {
   return { e, triXs, triYs, eMin, eMax };
 }
 
-function buildTraces(result: CalcResult, stats: TriangleStats): Plotly.Data[] {
+interface PlotLabels {
+  colorbar: string;
+  conductor: string;
+}
+
+function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabels): Plotly.Data[] {
   const { triXs, triYs, e, eMin, eMax } = stats;
   // Saturate the upper end at 99th percentile so the corner singularities
   // don't wash out the rest of the field. (Phase 8 will let the user
@@ -133,7 +139,7 @@ function buildTraces(result: CalcResult, stats: TriangleStats): Plotly.Data[] {
     showscale: true,
     opacity: 0,
     hoverinfo: 'skip',
-    colorbar: { title: { text: '|E|  [V/length]' }, len: 0.8 },
+    colorbar: { title: { text: labels.colorbar }, len: 0.8 },
   } as Plotly.Data);
 
   // Conductor outline.
@@ -145,7 +151,7 @@ function buildTraces(result: CalcResult, stats: TriangleStats): Plotly.Data[] {
     x: [-halfW, halfW, halfW, -halfW, -halfW],
     y: [h, h, h + t, h + t, h],
     line: { color: '#dd2222', width: 2 },
-    name: 'Conductor',
+    name: labels.conductor,
     hoverinfo: 'skip',
     showlegend: false,
   });
@@ -155,6 +161,7 @@ function buildTraces(result: CalcResult, stats: TriangleStats): Plotly.Data[] {
 
 export function CrossSectionPlot({ result }: CrossSectionPlotProps): React.ReactElement {
   const ref = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!ref.current) return;
@@ -163,21 +170,25 @@ export function CrossSectionPlot({ result }: CrossSectionPlotProps): React.React
       return;
     }
     const stats = computeTriangleStats(result);
-    const traces = buildTraces(result, stats);
+    const labels: PlotLabels = {
+      colorbar: t('plot.colorbar'),
+      conductor: t('plot.conductor'),
+    };
+    const traces = buildTraces(result, stats, labels);
     const layout: Partial<Plotly.Layout> = {
-      title: { text: 'Cross-section · |E| heatmap' },
-      xaxis: { title: { text: 'x [mm]' }, scaleanchor: 'y', scaleratio: 1 },
-      yaxis: { title: { text: 'y [mm]' } },
+      title: { text: t('plot.title') },
+      xaxis: { title: { text: t('plot.xAxis') }, scaleanchor: 'y', scaleratio: 1 },
+      yaxis: { title: { text: t('plot.yAxis') } },
       margin: { t: 50, r: 20, b: 50, l: 60 },
       showlegend: false,
     };
     void Plotly.react(ref.current, traces, layout, { responsive: true, displaylogo: false });
-  }, [result]);
+  }, [result, t]);
 
   return (
     <section className="cross-section-plot">
       <div ref={ref} style={{ width: '100%', height: 500 }} />
-      {!result && <p className="hint cross-section-plot__hint">No mesh yet.</p>}
+      {!result && <p className="hint cross-section-plot__hint">{t('plot.empty')}</p>}
     </section>
   );
 }

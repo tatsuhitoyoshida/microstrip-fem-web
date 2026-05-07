@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type LengthUnit, MIL_TO_MM, toMm } from '../lib/units';
 import type { MicrostripParams } from '../types';
 
@@ -31,9 +32,8 @@ export function ParameterForm({
   onCalculate,
   onFindOptimalW,
 }: ParameterFormProps): React.ReactElement {
+  const { t } = useTranslation();
   const [unit, setUnit] = useState<LengthUnit>('mm');
-  // Length state is stored in the *current* display unit. On unit change we
-  // rescale all four inputs at once.
   const [width, setWidth] = useState(DEFAULTS.width);
   const [height, setHeight] = useState(DEFAULTS.height);
   const [thickness, setThickness] = useState(DEFAULTS.thickness);
@@ -79,10 +79,10 @@ export function ParameterForm({
 
   return (
     <form className="parameter-form" onSubmit={handleCalculate}>
-      <h2>Parameters</h2>
+      <h2>{t('form.title')}</h2>
 
       <fieldset className="unit-toggle">
-        <legend>Length units</legend>
+        <legend>{t('form.unitsLegend')}</legend>
         <label>
           <input
             type="radio"
@@ -107,7 +107,7 @@ export function ParameterForm({
 
       <NumberField
         id="param-w"
-        label={`Trace width W [${unit}]`}
+        label={t('form.width', { unit })}
         value={width}
         onChange={setWidth}
         step={unit === 'mm' ? 0.01 : 1}
@@ -115,7 +115,7 @@ export function ParameterForm({
       />
       <NumberField
         id="param-h"
-        label={`Substrate height h [${unit}]`}
+        label={t('form.height', { unit })}
         value={height}
         onChange={setHeight}
         step={unit === 'mm' ? 0.01 : 1}
@@ -123,7 +123,7 @@ export function ParameterForm({
       />
       <NumberField
         id="param-t"
-        label={`Conductor thickness t [${unit}]`}
+        label={t('form.thickness', { unit })}
         value={thickness}
         onChange={setThickness}
         step={unit === 'mm' ? 0.001 : 0.1}
@@ -131,7 +131,7 @@ export function ParameterForm({
       />
       <NumberField
         id="param-er"
-        label="Relative permittivity εr"
+        label={t('form.epsilonR')}
         value={epsilonR}
         onChange={setEpsilonR}
         step={0.01}
@@ -142,7 +142,7 @@ export function ParameterForm({
 
       <NumberField
         id="param-target"
-        label="Target Z₀ [Ω]"
+        label={t('form.targetZ0')}
         value={targetZ0}
         onChange={setTargetZ0}
         step={0.5}
@@ -151,15 +151,15 @@ export function ParameterForm({
 
       <div className="parameter-form__buttons">
         <button type="submit" disabled={!allValid || isLoading}>
-          Calculate
+          {t('form.calculate')}
         </button>
         <button
           type="button"
           onClick={handleFindW}
           disabled={!allValid || !targetValid || isLoading}
-          title="Bisection on Z₀(W) using FEM"
+          title={t('form.findWTooltip')}
         >
-          Find W for target Z₀
+          {t('form.findW')}
         </button>
       </div>
     </form>
