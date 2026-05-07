@@ -25,21 +25,39 @@ function loadPlotly(): Promise<PlotlyModule> {
   return plotlyModulePromise;
 }
 
-const N_BINS = 12;
-const VIRIDIS_12 = [
+// More bins → smoother colour gradient on the heatmap (the per-bin scatter
+// traces dwarf the gradient resolution otherwise).
+const N_BINS = 24;
+const VIRIDIS_24 = [
   '#440154',
-  '#482475',
+  '#481467',
+  '#482576',
+  '#463480',
   '#414487',
+  '#3b528b',
   '#355f8d',
+  '#2f6c8e',
   '#2a788e',
+  '#26828e',
   '#21908d',
+  '#1f9c89',
   '#22a884',
+  '#2eb37c',
   '#44bf70',
+  '#5cc863',
   '#7ad151',
-  '#bddf26',
+  '#94d840',
+  '#b0dd2f',
+  '#c8e020',
+  '#dde318',
+  '#ece51b',
+  '#f5e923',
   '#fde725',
-  '#fffbd5',
 ];
+
+const METAL_COLOR = '#dd2222';
+const METAL_BORDER = '#8a1111';
+const INTERFACE_COLOR = 'rgba(245, 245, 245, 0.85)';
 
 export interface CrossSectionPlotProps {
   result: CalcResult | null;
@@ -97,6 +115,8 @@ function computeTriangleStats(result: CalcResult): TriangleStats {
 interface PlotLabels {
   colorbar: string;
   conductor: string;
+  ground: string;
+  interface: string;
 }
 
 function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabels): Plotly.Data[] {
@@ -124,7 +144,7 @@ function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabel
   }
 
   const traces: Plotly.Data[] = buckets.map((b, bin) => {
-    const color = VIRIDIS_12[bin] ?? '#222';
+    const color = VIRIDIS_24[bin] ?? '#222';
     return {
       type: 'scatter',
       mode: 'lines',
@@ -132,7 +152,10 @@ function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabel
       y: b.ys,
       fill: 'toself',
       fillcolor: color,
-      line: { color, width: 0.2 },
+      // Match the line colour to the fill so triangle edges blend into a
+      // smooth field; setting width=0 leaves single-pixel artefacts in
+      // some renderers, so a same-colour line of nominal width is safer.
+      line: { color, width: 0.5 },
       hoverinfo: 'skip',
       showlegend: false,
     };
@@ -144,22 +167,52 @@ function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabel
     x: [eMin, eClipMax],
     y: [0, 0],
     z: [[eMin, eClipMax]],
-    colorscale: VIRIDIS_12.map((c, i) => [i / (VIRIDIS_12.length - 1), c]),
+    colorscale: VIRIDIS_24.map((c, i) => [i / (VIRIDIS_24.length - 1), c]),
     showscale: true,
     opacity: 0,
     hoverinfo: 'skip',
     colorbar: { title: { text: labels.colorbar }, len: 0.8 },
   } as Plotly.Data);
 
-  // Conductor outline.
+  // Substrate–air interface (dashed, broken around the conductor footprint).
   const { width: W, height: h, thickness: t } = result.paramsUsed;
   const halfW = W / 2;
+  const { xMin, xMax } = result.fem.bounds;
+  traces.push({
+    type: 'scatter',
+    mode: 'lines',
+    x: [xMin, -halfW, null, halfW, xMax],
+    y: [h, h, null, h, h],
+    line: { color: INTERFACE_COLOR, width: 1.2, dash: 'dash' },
+    name: labels.interface,
+    hoverinfo: 'skip',
+    showlegend: false,
+  });
+
+  // Ground plane — same red treatment as the signal conductor, drawn as a
+  // thick line along y = 0 across the full domain.
+  traces.push({
+    type: 'scatter',
+    mode: 'lines',
+    x: [xMin, xMax],
+    y: [0, 0],
+    line: { color: METAL_COLOR, width: 6 },
+    name: labels.ground,
+    hoverinfo: 'skip',
+    showlegend: false,
+  });
+
+  // Signal conductor — filled red rectangle so it visually reads as a metal
+  // block (the FEM treats this region as a hole, so the heatmap doesn't
+  // bleed into it).
   traces.push({
     type: 'scatter',
     mode: 'lines',
     x: [-halfW, halfW, halfW, -halfW, -halfW],
     y: [h, h, h + t, h + t, h],
-    line: { color: '#dd2222', width: 2 },
+    fill: 'toself',
+    fillcolor: METAL_COLOR,
+    line: { color: METAL_BORDER, width: 1 },
     name: labels.conductor,
     hoverinfo: 'skip',
     showlegend: false,
@@ -187,14 +240,42 @@ export function CrossSectionPlot({ result }: CrossSectionPlotProps): React.React
       const labels: PlotLabels = {
         colorbar: t('plot.colorbar'),
         conductor: t('plot.conductor'),
+        ground: t('plot.ground'),
+        interface: t('plot.interface'),
       };
       const traces = buildTraces(result, stats, labels);
+      const { height: h, thickness: tk, epsilonR } = result.paramsUsed;
+      const { xMin, xMax, yMax } = result.fem.bounds;
+      // Anchor the substrate / air labels to the left edge so they don't
+      // collide with the conductor or its field singularity.
+      const annoX = xMin + 0.04 * (xMax - xMin);
+      const labelStyle = {
+        showarrow: false,
+        font: { color: '#1f2933', size: 11 },
+        bgcolor: 'rgba(255,255,255,0.78)',
+        borderpad: 2,
+        xanchor: 'left' as const,
+      };
       const layout: Partial<Plotly.Layout> = {
         title: { text: t('plot.title') },
         xaxis: { title: { text: t('plot.xAxis') }, scaleanchor: 'y', scaleratio: 1 },
         yaxis: { title: { text: t('plot.yAxis') } },
         margin: { t: 50, r: 20, b: 50, l: 60 },
         showlegend: false,
+        annotations: [
+          {
+            ...labelStyle,
+            x: annoX,
+            y: h * 0.5,
+            text: t('plot.substrateLabel', { er: epsilonR.toFixed(2) }),
+          },
+          {
+            ...labelStyle,
+            x: annoX,
+            y: h + tk + 0.5 * (yMax - h - tk),
+            text: t('plot.airLabel'),
+          },
+        ],
       };
       void Plotly.react(node, traces, layout, { responsive: true, displaylogo: false });
     })();

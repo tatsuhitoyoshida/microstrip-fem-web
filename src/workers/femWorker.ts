@@ -56,11 +56,16 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>): Promise<void> => {
 
     if (msg.type === 'findW') {
       progress(id, 'searching');
-      const opt = findOptimalWidth(
-        msg.target,
-        msg.fixed,
-        msg.options ? { solveOptions: msg.options } : {},
-      );
+      // Bisection probes don't need report-quality accuracy — just enough
+      // to pin down W. A ~5 k-triangle mesh during the search keeps each
+      // probe under ~50 ms, so the whole 8–9-iteration loop stays
+      // sub-second. The final solve below uses the user's chosen density.
+      const searchOptions = {
+        solveOptions: {
+          geometry: { substrateMaxArea: 0.05, airMaxArea: 0.5 },
+        },
+      };
+      const opt = findOptimalWidth(msg.target, msg.fixed, searchOptions);
       const params = { ...msg.fixed, width: opt.width };
       progress(id, 'meshing-and-solving');
       const fem = solveMicrostrip(params, msg.options);

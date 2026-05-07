@@ -50,7 +50,11 @@
     "yAxis": "y [mm]",
     "colorbar": "|E| [V/length]",
     "empty": "No mesh yet.",
-    "conductor": "Conductor"
+    "conductor": "Conductor",
+    "ground": "Ground plane",
+    "interface": "Substrate–air interface",
+    "substrateLabel": "Substrate (εᵣ = {{er}})",
+    "airLabel": "Air (εᵣ = 1)"
   },
   "about": {
     "toggleShow": "About this tool",

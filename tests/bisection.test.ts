@@ -30,13 +30,29 @@ describe('inverseHammerstadJensen', () => {
   });
 });
 
+// Bisection takes 8–9 FEM probes; the production-default mesh (~25 k tri)
+// would push each probe past 250 ms. The bisection algorithm itself is
+// mesh-independent, so the tests run with a deliberately coarser grid for
+// speed. The convergence criterion (|Z₀ − 50| < 0.05 Ω) is checked against
+// whatever Z₀ that mesh produces, not against Hammerstad–Jensen.
+const COARSE_SOLVE_OPTIONS = {
+  geometry: {
+    substrateMaxArea: 0.05,
+    airMaxArea: 0.5,
+  },
+};
+
 describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
   beforeAll(async () => {
     await initMesh(WASM_PATH);
   });
 
   it('FR-4 50 Ω target → recovers W with |Z₀ − 50| < 0.05 Ω', () => {
-    const result = findOptimalWidth(50, { height: 1.6, thickness: 0.035, epsilonR: 4.4 });
+    const result = findOptimalWidth(
+      50,
+      { height: 1.6, thickness: 0.035, epsilonR: 4.4 },
+      { solveOptions: COARSE_SOLVE_OPTIONS },
+    );
 
     console.log(
       `  FR-4 50 Ω: W = ${result.width.toFixed(4)} mm (HJ estimate ${result.hammerstadEstimate.toFixed(4)} mm), ` +
@@ -52,7 +68,11 @@ describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
   });
 
   it('RT/duroid 50 Ω target → recovers W within 0.05 Ω', () => {
-    const result = findOptimalWidth(50, { height: 0.787, thickness: 0.018, epsilonR: 2.2 });
+    const result = findOptimalWidth(
+      50,
+      { height: 0.787, thickness: 0.018, epsilonR: 2.2 },
+      { solveOptions: COARSE_SOLVE_OPTIONS },
+    );
 
     console.log(
       `  RT/duroid 50 Ω: W = ${result.width.toFixed(4)} mm (HJ ${result.hammerstadEstimate.toFixed(4)} mm), ` +
@@ -64,7 +84,11 @@ describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
   });
 
   it('handles a non-50 target (75 Ω) on FR-4', () => {
-    const result = findOptimalWidth(75, { height: 1.6, thickness: 0.035, epsilonR: 4.4 });
+    const result = findOptimalWidth(
+      75,
+      { height: 1.6, thickness: 0.035, epsilonR: 4.4 },
+      { solveOptions: COARSE_SOLVE_OPTIONS },
+    );
     expect(result.converged).toBe(true);
     expect(Math.abs(result.z0 - 75)).toBeLessThan(0.05);
   });

@@ -50,7 +50,11 @@
     "yAxis": "y [mm]",
     "colorbar": "|E| [V/長さ]",
     "empty": "まだメッシュがありません。",
-    "conductor": "導体"
+    "conductor": "導体",
+    "ground": "接地面",
+    "interface": "基板 / 空気 界面",
+    "substrateLabel": "基板 (εᵣ = {{er}})",
+    "airLabel": "空気 (εᵣ = 1)"
   },
   "about": {
     "toggleShow": "このツールについて",
