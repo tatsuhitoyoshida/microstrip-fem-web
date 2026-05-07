@@ -28,6 +28,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "plotly.js-dist-min": "^3.5.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "triangle-wasm": "^1.0.0"
@@ -38,6 +39,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.12.2",
+    "@types/plotly.js": "^3.0.10",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/triangle-wasm": "^1.0.2",

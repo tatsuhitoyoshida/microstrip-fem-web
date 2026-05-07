@@ -7,7 +7,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import path from 'node:path';
 import { buildMicrostripPslg } from '../src/fem/geometry';
 import { initMesh, meshFromPslg } from '../src/fem/mesh';
-import { RegionAttr } from '../src/types';
+import { Marker, RegionAttr } from '../src/types';
 
 // triangle-wasm's Emscripten loader detects Node first (even under jsdom) and
 // reads the .wasm via fs.readFileSync, so we hand it a plain filesystem path.
@@ -62,10 +62,9 @@ describe('mesh generation — triangle-wasm integration', () => {
     const { pslg } = buildMicrostripPslg(FR4);
     const mesh = meshFromPslg(pslg);
     const markers = new Set(Array.from(mesh.vertexMarkers));
-    // ground (1), outer (2) and conductor (3) must all be present
-    expect(markers.has(1)).toBe(true);
-    expect(markers.has(2)).toBe(true);
-    expect(markers.has(3)).toBe(true);
+    expect(markers.has(Marker.Ground)).toBe(true);
+    expect(markers.has(Marker.OuterBoundary)).toBe(true);
+    expect(markers.has(Marker.Conductor)).toBe(true);
   });
 
   it('all triangle vertex indices are in range', () => {

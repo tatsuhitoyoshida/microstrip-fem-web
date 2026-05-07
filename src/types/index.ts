@@ -30,17 +30,22 @@ export interface MicrostripResult {
  * apply Dirichlet conditions (conductor / ground / outer) and identifies the
  * dielectric interface for diagnostics.
  */
+// Markers are ordered so that, when Triangle has to pick a single marker for
+// a vertex shared by multiple boundaries, the higher absolute value wins
+// (per the Triangle docs). Conductor must therefore beat
+// DielectricInterface — otherwise the conductor corners that sit on the
+// substrate–air line would lose their φ = V_drive condition.
 export const Marker = {
   /** No special boundary (interior). Triangle's default. */
   Interior: 0,
-  /** Ground plane at the bottom of the substrate (φ = 0). */
-  Ground: 1,
+  /** Substrate–air dielectric interface; no Dirichlet BC. */
+  DielectricInterface: 1,
   /** Outer (truncation) boundary, treated as φ = 0 (∞ approximation). */
   OuterBoundary: 2,
+  /** Ground plane at the bottom of the substrate (φ = 0). */
+  Ground: 3,
   /** Conductor surface (signal trace), φ = V_drive (1 V by convention). */
-  Conductor: 3,
-  /** Substrate–air dielectric interface; no Dirichlet BC. */
-  DielectricInterface: 4,
+  Conductor: 4,
 } as const;
 export type MarkerValue = (typeof Marker)[keyof typeof Marker];
 
