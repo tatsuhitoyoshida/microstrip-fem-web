@@ -12,7 +12,7 @@ import './App.css';
 
 function App(): React.ReactElement {
   const { t } = useTranslation();
-  const { result, isLoading, error, computeForward, findOptimalW } = useMicrostripCalc();
+  const { result, isLoading, progress, error, computeForward, findOptimalW } = useMicrostripCalc();
   const [showAbout, setShowAbout] = useState(false);
   // The form is the source of truth for the display unit; we only need it
   // here for the panels that render derived lengths.
@@ -54,7 +54,13 @@ function App(): React.ReactElement {
 
         <section className="app__viz">
           <CrossSectionPlot result={result} />
-          <ResultsPanel result={result} isLoading={isLoading} error={error} unit={unit} />
+          <ResultsPanel
+            result={result}
+            isLoading={isLoading}
+            progress={progress}
+            error={error}
+            unit={unit}
+          />
           <ComparisonTable result={result} />
         </section>
       </main>

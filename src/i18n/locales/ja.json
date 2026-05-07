@@ -18,6 +18,11 @@
   "results": {
     "title": "結果",
     "loading": "FEM 計算中…",
+    "progress": {
+      "init": "メッシュエンジン読み込み中…",
+      "meshing-and-solving": "メッシュ生成 + FEM 計算中…",
+      "searching": "最適 W を探索中…"
+    },
     "empty": "パラメータを設定して「計算」を押してください。",
     "errorPrefix": "エラー: {{message}}",
     "z0": "Z₀",

@@ -18,6 +18,11 @@
   "results": {
     "title": "Results",
     "loading": "Solving FEM…",
+    "progress": {
+      "init": "Loading mesh engine…",
+      "meshing-and-solving": "Meshing and solving FEM…",
+      "searching": "Searching for optimal W…"
+    },
     "empty": "Set parameters and press Calculate.",
     "errorPrefix": "Error: {{message}}",
     "z0": "Z₀",

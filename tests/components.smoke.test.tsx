@@ -28,12 +28,14 @@ describe('UI components smoke', () => {
   });
 
   it('ResultsPanel without a result prompts the user to press Calculate', () => {
-    render(<ResultsPanel result={null} isLoading={false} error={null} unit="mm" />);
+    render(<ResultsPanel result={null} isLoading={false} progress={null} error={null} unit="mm" />);
     expect(screen.getByText(/press calculate/i)).toBeInTheDocument();
   });
 
   it('ResultsPanel surfaces errors', () => {
-    render(<ResultsPanel result={null} isLoading={false} error="kaboom" unit="mm" />);
+    render(
+      <ResultsPanel result={null} isLoading={false} progress={null} error="kaboom" unit="mm" />,
+    );
     expect(screen.getByText(/kaboom/)).toBeInTheDocument();
   });
 

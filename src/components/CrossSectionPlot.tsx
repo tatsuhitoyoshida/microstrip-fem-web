@@ -13,8 +13,17 @@
 
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import Plotly from 'plotly.js-dist-min';
+// Type-only import — the runtime module is loaded lazily inside the effect
+// below so Plotly stays out of the initial bundle (CLAUDE.md §6 Phase 8).
+import type * as Plotly from 'plotly.js';
 import type { CalcResult } from '../hooks/useMicrostripCalc';
+
+type PlotlyModule = typeof import('plotly.js-dist-min');
+let plotlyModulePromise: Promise<PlotlyModule> | null = null;
+function loadPlotly(): Promise<PlotlyModule> {
+  if (!plotlyModulePromise) plotlyModulePromise = import('plotly.js-dist-min');
+  return plotlyModulePromise;
+}
 
 const N_BINS = 12;
 const VIRIDIS_12 = [
@@ -164,30 +173,39 @@ export function CrossSectionPlot({ result }: CrossSectionPlotProps): React.React
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!ref.current) return;
-    if (!result) {
-      void Plotly.purge(ref.current);
-      return;
-    }
-    const stats = computeTriangleStats(result);
-    const labels: PlotLabels = {
-      colorbar: t('plot.colorbar'),
-      conductor: t('plot.conductor'),
+    const node = ref.current;
+    if (!node) return;
+    let cancelled = false;
+    void (async () => {
+      const Plotly = (await loadPlotly()).default;
+      if (cancelled || !ref.current) return;
+      if (!result) {
+        Plotly.purge(node);
+        return;
+      }
+      const stats = computeTriangleStats(result);
+      const labels: PlotLabels = {
+        colorbar: t('plot.colorbar'),
+        conductor: t('plot.conductor'),
+      };
+      const traces = buildTraces(result, stats, labels);
+      const layout: Partial<Plotly.Layout> = {
+        title: { text: t('plot.title') },
+        xaxis: { title: { text: t('plot.xAxis') }, scaleanchor: 'y', scaleratio: 1 },
+        yaxis: { title: { text: t('plot.yAxis') } },
+        margin: { t: 50, r: 20, b: 50, l: 60 },
+        showlegend: false,
+      };
+      void Plotly.react(node, traces, layout, { responsive: true, displaylogo: false });
+    })();
+    return () => {
+      cancelled = true;
     };
-    const traces = buildTraces(result, stats, labels);
-    const layout: Partial<Plotly.Layout> = {
-      title: { text: t('plot.title') },
-      xaxis: { title: { text: t('plot.xAxis') }, scaleanchor: 'y', scaleratio: 1 },
-      yaxis: { title: { text: t('plot.yAxis') } },
-      margin: { t: 50, r: 20, b: 50, l: 60 },
-      showlegend: false,
-    };
-    void Plotly.react(ref.current, traces, layout, { responsive: true, displaylogo: false });
   }, [result, t]);
 
   return (
     <section className="cross-section-plot">
-      <div ref={ref} style={{ width: '100%', height: 500 }} />
+      <div ref={ref} className="cross-section-plot__canvas" />
       {!result && <p className="hint cross-section-plot__hint">{t('plot.empty')}</p>}
     </section>
   );

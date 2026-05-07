@@ -6,10 +6,12 @@
 import { useTranslation } from 'react-i18next';
 import type { CalcResult } from '../hooks/useMicrostripCalc';
 import { type LengthUnit, formatLength } from '../lib/units';
+import type { ProgressStage } from '../workers/messages';
 
 export interface ResultsPanelProps {
   result: CalcResult | null;
   isLoading: boolean;
+  progress: ProgressStage | null;
   error: string | null;
   unit: LengthUnit;
 }
@@ -17,6 +19,7 @@ export interface ResultsPanelProps {
 export function ResultsPanel({
   result,
   isLoading,
+  progress,
   error,
   unit,
 }: ResultsPanelProps): React.ReactElement {
@@ -31,11 +34,13 @@ export function ResultsPanel({
     );
   }
 
+  const loadingLabel = progress ? t(`results.progress.${progress}`) : t('results.loading');
+
   if (isLoading && !result) {
     return (
       <section className="results-panel">
         <h2>{t('results.title')}</h2>
-        <p className="loading">{t('results.loading')}</p>
+        <p className="loading">{loadingLabel}</p>
       </section>
     );
   }
@@ -54,6 +59,7 @@ export function ResultsPanel({
   return (
     <section className={`results-panel${isLoading ? ' results-panel--reloading' : ''}`}>
       <h2>{t('results.title')}</h2>
+      {isLoading && <p className="loading">{loadingLabel}</p>}
       <dl className="results-panel__numbers">
         <dt>{t('results.z0')}</dt>
         <dd>{fem.z0.toFixed(3)} Ω</dd>
