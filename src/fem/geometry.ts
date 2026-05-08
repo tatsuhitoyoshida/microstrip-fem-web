@@ -39,11 +39,13 @@ export interface BuiltGeometry {
 }
 
 /** Default ratios used when no per-region area constraint is supplied.
- *  Tuned to ~25 k triangles on the standard FR-4 case — fine enough that
- *  the |E| heatmap reads as a smooth gradient. With the Phase 8 Web Worker
- *  the UI no longer blocks during the resulting ~400 ms solve. */
-const DEFAULT_SUBSTRATE_TRIANGLE_TARGET = 8000;
-const DEFAULT_AIR_TRIANGLE_TARGET = 16000;
+ *  Tuned to ~40 k triangles on the standard FR-4 case — the practical
+ *  ceiling allowed by the upstream triangle-wasm 16 MB heap (see
+ *  `mesh.ts`). With the Phase 8 Web Worker the resulting ~600 ms solve
+ *  does not block the UI; bisection still uses a coarse override
+ *  (see `femWorker.ts`) to stay sub-second. */
+const DEFAULT_SUBSTRATE_TRIANGLE_TARGET = 12000;
+const DEFAULT_AIR_TRIANGLE_TARGET = 24000;
 
 export function buildMicrostripPslg(
   params: MicrostripParams,

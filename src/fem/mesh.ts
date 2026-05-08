@@ -26,6 +26,13 @@ export function _resetInitForTesting(): void {
  * Loads the Triangle WebAssembly module. Must be awaited before any call to
  * {@link meshFromPslg}. Calling more than once is a no-op.
  *
+ * Note: the upstream triangle-wasm build is compiled without
+ * `ALLOW_MEMORY_GROWTH` and caps its WebAssembly heap at 16 MB. In
+ * practice that ceiling is hit at roughly 60 k triangles per call, which
+ * is the implicit upper bound on `DEFAULT_*_TRIANGLE_TARGET` in
+ * `geometry.ts`. Bumping the heap requires recompiling the wasm binary,
+ * which is deferred to a future phase.
+ *
  * @param wasmUrl URL or file path passed to Emscripten's locateFile. Default
  *   `'/triangle.out.wasm'` matches the asset copied into `public/`.
  */

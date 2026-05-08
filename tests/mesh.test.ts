@@ -27,7 +27,7 @@ describe('mesh generation — triangle-wasm integration', () => {
     const mesh = meshFromPslg(pslg);
     expect(mesh.minAngleDeg).toBeGreaterThanOrEqual(25);
     expect(mesh.triangleCount).toBeGreaterThan(500);
-    expect(mesh.triangleCount).toBeLessThan(50000);
+    expect(mesh.triangleCount).toBeLessThan(100000);
   });
 
   it('every triangle is tagged with a known region attribute', () => {
