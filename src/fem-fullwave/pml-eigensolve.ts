@@ -84,6 +84,9 @@ export interface PmlEigensolveOptions {
   outerTol?: number;
   /** Outer eigenvalue iteration cap. Default 200. */
   outerMaxIter?: number;
+  /** Inner Bi-CGSTAB iteration cap inside the shift-invert outer
+   *  loop. Falls back to BiCGStab's default (4·n) when omitted. */
+  innerMaxIter?: number;
   /** When true, recover the E_z (node) component of the eigenvector
    *  via one extra inner solve. Default true. */
   recoverEz?: boolean;
@@ -178,6 +181,9 @@ export function solveMixedSystemPml(
     tol: outerTol,
     maxIter: outerMaxIter,
     innerTol,
+    ...(options.innerMaxIter !== undefined
+      ? { innerMaxIter: options.innerMaxIter }
+      : {}),
   });
 
   // 6. Recover E_z (free-node DoFs) from the converged β² and

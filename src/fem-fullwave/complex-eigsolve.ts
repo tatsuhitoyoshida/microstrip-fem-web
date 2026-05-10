@@ -67,7 +67,9 @@ export interface ComplexShiftInvertOptions {
   maxIter?: number;
   /** Inner Bi-CGSTAB tolerance. Default 1e-10. */
   innerTol?: number;
-  /** Inner Bi-CGSTAB iteration cap. Default 4·n (delegated). */
+  /** Inner Bi-CGSTAB iteration cap. Defaults to BiCGStab's own default
+   *  (4·n). Set higher for ill-conditioned systems where stagnation is
+   *  the convergence failure mode. */
   innerMaxIter?: number;
   /** Initial guess (interleaved complex, length 2·n). Random if omitted. */
   initialGuess?: Float64Array;
