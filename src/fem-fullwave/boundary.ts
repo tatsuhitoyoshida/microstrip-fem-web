@@ -18,6 +18,10 @@
  */
 
 import { CooBuilder, type CsrMatrix } from '../fem/sparse';
+import {
+  ComplexCooBuilder,
+  type ComplexCsrMatrix,
+} from './complex-sparse';
 
 export interface DirichletPartition {
   /** Length nFree. Original-system indices of the free (non-Dirichlet) DOFs. */
@@ -107,6 +111,55 @@ export function restrictRect(
       const fj = colPartition.freeOf[j]!;
       if (fj === -1) continue;
       builder.add(fi, fj, A.values[k]!);
+    }
+  }
+  return builder.toCsr();
+}
+
+/**
+ * Complex twin of `restrictToFree`. Same logic, complex storage.
+ */
+export function restrictToFreeComplex(
+  A: ComplexCsrMatrix,
+  partition: DirichletPartition,
+): ComplexCsrMatrix {
+  if (A.numRows !== A.numCols) {
+    throw new Error(
+      `restrictToFreeComplex: matrix must be square, got ${A.numRows}×${A.numCols}`,
+    );
+  }
+  const nFree = partition.freeIndices.length;
+  const builder = new ComplexCooBuilder(nFree);
+  for (let i = 0; i < A.numRows; i++) {
+    const fi = partition.freeOf[i]!;
+    if (fi === -1) continue;
+    for (let k = A.rowPtr[i]!; k < A.rowPtr[i + 1]!; k++) {
+      const j = A.colIdx[k]!;
+      const fj = partition.freeOf[j]!;
+      if (fj === -1) continue;
+      builder.add(fi, fj, A.values[2 * k]!, A.values[2 * k + 1]!);
+    }
+  }
+  return builder.toCsr();
+}
+
+/** Complex twin of `restrictRect` for rectangular complex blocks. */
+export function restrictRectComplex(
+  A: ComplexCsrMatrix,
+  rowPartition: DirichletPartition,
+  colPartition: DirichletPartition,
+): ComplexCsrMatrix {
+  const numFreeRows = rowPartition.freeIndices.length;
+  const numFreeCols = colPartition.freeIndices.length;
+  const builder = new ComplexCooBuilder(numFreeRows, numFreeCols);
+  for (let i = 0; i < A.numRows; i++) {
+    const fi = rowPartition.freeOf[i]!;
+    if (fi === -1) continue;
+    for (let k = A.rowPtr[i]!; k < A.rowPtr[i + 1]!; k++) {
+      const j = A.colIdx[k]!;
+      const fj = colPartition.freeOf[j]!;
+      if (fj === -1) continue;
+      builder.add(fi, fj, A.values[2 * k]!, A.values[2 * k + 1]!);
     }
   }
   return builder.toCsr();
