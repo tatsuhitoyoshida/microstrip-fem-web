@@ -330,19 +330,51 @@ function NumberField({
   disabled,
   hint,
 }: NumberFieldProps): React.ReactElement {
+  // Local string buffer so the user can clear the field, retype, and key
+  // through partial decimals (e.g. "0." while heading toward "0.04")
+  // without the parent state silently snapping to zero. Without this the
+  // browser fires onChange with "" on clear, `Number("")` returns 0, and
+  // the form bounces straight to invalid mid-keystroke.
+  const [text, setText] = useState<string>(() => String(value));
+  // React-recommended pattern (https://react.dev/learn/you-might-not-need-an-effect):
+  // resync derived state by comparing the previous prop in state during
+  // render rather than through useEffect. React bails the second render
+  // out when nothing else changed, so this is cheaper and avoids the
+  // useEffect-fires-after-paint flash.
+  const [lastValue, setLastValue] = useState(value);
+  if (lastValue !== value) {
+    setLastValue(value);
+    if (Number(text) !== value) {
+      setText(String(value));
+    }
+  }
+
   return (
     <div className={`number-field${disabled ? ' number-field--disabled' : ''}`}>
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
         type="number"
-        value={value}
+        value={text}
         step={step}
         min={min}
         disabled={disabled}
         onChange={(e) => {
-          const next = Number(e.target.value);
-          if (Number.isFinite(next)) onChange(next);
+          const raw = e.target.value;
+          setText(raw);
+          // Skip the parent update for empty / partial inputs (lone sign,
+          // trailing dot, etc.). They can't be parsed yet, so propagating
+          // them as 0 / NaN would only nuke the validity badge.
+          if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return;
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) onChange(parsed);
+        }}
+        onBlur={() => {
+          // If the user tabs away mid-edit (empty / unparseable), snap
+          // back to the canonical parent value so the form stays valid.
+          if (text === '' || !Number.isFinite(Number(text))) {
+            setText(String(value));
+          }
         }}
       />
       {hint && <p className="number-field__hint">{hint}</p>}

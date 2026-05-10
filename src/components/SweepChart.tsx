@@ -198,38 +198,75 @@ export function SweepChart({ result }: SweepChartProps): React.ReactElement {
     <section className="sweep-chart">
       <h2>{t('sweep.title')}</h2>
       <div className="sweep-chart__controls">
-        <div className="number-field">
-          <label htmlFor="sweep-start">{t('sweep.startGHz')}</label>
-          <input
-            id="sweep-start"
-            type="number"
-            min={1e-3}
-            step={0.1}
-            value={startGHz}
-            onChange={(e) => {
-              const next = Number(e.target.value);
-              if (Number.isFinite(next) && next > 0) setStartGHz(next);
-            }}
-          />
-        </div>
-        <div className="number-field">
-          <label htmlFor="sweep-stop">{t('sweep.stopGHz')}</label>
-          <input
-            id="sweep-stop"
-            type="number"
-            min={1e-3}
-            step={1}
-            value={stopGHz}
-            onChange={(e) => {
-              const next = Number(e.target.value);
-              if (Number.isFinite(next) && next > 0) setStopGHz(next);
-            }}
-          />
-        </div>
+        <FrequencyField
+          id="sweep-start"
+          label={t('sweep.startGHz')}
+          step={0.1}
+          value={startGHz}
+          onChange={setStartGHz}
+        />
+        <FrequencyField
+          id="sweep-stop"
+          label={t('sweep.stopGHz')}
+          step={1}
+          value={stopGHz}
+          onChange={setStopGHz}
+        />
       </div>
       <div ref={ref} className="sweep-chart__canvas" />
       {!result && <p className="hint sweep-chart__hint">{t('sweep.empty')}</p>}
       <p className="sweep-chart__note">{t('sweep.note')}</p>
     </section>
+  );
+}
+
+interface FrequencyFieldProps {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+  step: number;
+}
+
+/**
+ * Reused-here-only number input with the same string-buffer pattern as
+ * `ParameterForm`'s `NumberField`: clearing the field doesn't snap the
+ * parent state to 0, and partial decimals (`"0."`, `"-"`, etc.) are held
+ * in the buffer until they parse cleanly.
+ */
+function FrequencyField({ id, label, value, onChange, step }: FrequencyFieldProps): React.ReactElement {
+  const [text, setText] = useState<string>(() => String(value));
+  // Same in-render resync pattern as ParameterForm's NumberField.
+  const [lastValue, setLastValue] = useState(value);
+  if (lastValue !== value) {
+    setLastValue(value);
+    if (Number(text) !== value) {
+      setText(String(value));
+    }
+  }
+
+  return (
+    <div className="number-field">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="number"
+        min={1e-3}
+        step={step}
+        value={text}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setText(raw);
+          if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return;
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed) && parsed > 0) onChange(parsed);
+        }}
+        onBlur={() => {
+          if (text === '' || !(Number(text) > 0)) {
+            setText(String(value));
+          }
+        }}
+      />
+    </div>
   );
 }
