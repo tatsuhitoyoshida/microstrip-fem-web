@@ -55,8 +55,28 @@ export interface DiagTensor2D {
   yy: Complex;
 }
 
-export type ComplexScalarWeight = (regionAttr: number) => Complex;
-export type AnisoWeight = (regionAttr: number) => DiagTensor2D;
+/**
+ * Per-triangle weight callback. The PML path needs the **triangle
+ * centroid** to evaluate spatially-varying stretch factors `s_x(x, y)`
+ * and `s_y(x, y)`, so the signature carries (x, y) alongside the
+ * region attribute. Callers that don't depend on position can simply
+ * declare them in the function but ignore them.
+ *
+ * The (x, y) values passed are the centroid of the triangle currently
+ * being assembled. For coarse PML zones this is a one-point quadrature
+ * approximation — accurate enough for first-pass validation; can be
+ * refined to multi-point if profiling shows it matters.
+ */
+export type ComplexScalarWeight = (
+  regionAttr: number,
+  x: number,
+  y: number,
+) => Complex;
+export type AnisoWeight = (
+  regionAttr: number,
+  x: number,
+  y: number,
+) => DiagTensor2D;
 
 /** Pull (x, y) for vertex `i` out of the flat `vertices` array. */
 function vertexXY(mesh: Mesh, i: number): [number, number] {
@@ -94,7 +114,9 @@ export function assembleEdgeCurlCurlComplex(
     const c2 = edgeCurl(geom, 2);
     const cs: [number, number, number] = [c0, c1, c2];
     const area = geom.area;
-    const gamma = weight(mesh.triangleAttributes[t]!);
+    const cx = (x0 + x1 + x2) / 3;
+    const cy = (y0 + y1 + y2) / 3;
+    const gamma = weight(mesh.triangleAttributes[t]!, cx, cy);
 
     for (let r = 0; r < 3; r++) {
       const er = topology.tri2edge[3 * t + r]!;
@@ -208,8 +230,10 @@ export function assembleEdgeMassAniso(
     const [x1, y1] = vertexXY(mesh, v1);
     const [x2, y2] = vertexXY(mesh, v2);
     const geom = triangleGeom(x0, y0, x1, y1, x2, y2);
+    const cx = (x0 + x1 + x2) / 3;
+    const cy = (y0 + y1 + y2) / 3;
 
-    const alpha = weight(mesh.triangleAttributes[t]!);
+    const alpha = weight(mesh.triangleAttributes[t]!, cx, cy);
     const Me = elementVectorMassAniso(geom, alpha);
 
     for (let r = 0; r < 3; r++) {
@@ -256,8 +280,10 @@ export function assembleEdgeNodeCouplingAniso(
     const [x1, y1] = vertexXY(mesh, v1);
     const [x2, y2] = vertexXY(mesh, v2);
     const geom = triangleGeom(x0, y0, x1, y1, x2, y2);
+    const cx = (x0 + x1 + x2) / 3;
+    const cy = (y0 + y1 + y2) / 3;
 
-    const alpha = weight(mesh.triangleAttributes[t]!);
+    const alpha = weight(mesh.triangleAttributes[t]!, cx, cy);
     const aThird = geom.area / 3;
 
     for (let k = 0; k < 3; k++) {
