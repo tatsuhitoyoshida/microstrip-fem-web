@@ -322,6 +322,55 @@ export function cscale(
   return y;
 }
 
+/** Complex multiplication: (a · b). */
+export function cmul(a: Complex, b: Complex): Complex {
+  return {
+    re: a.re * b.re - a.im * b.im,
+    im: a.re * b.im + a.im * b.re,
+  };
+}
+
+/** Complex division: a / b. Throws if |b| is zero. */
+export function cdiv(a: Complex, b: Complex): Complex {
+  const denom = b.re * b.re + b.im * b.im;
+  if (denom === 0) {
+    throw new Error('cdiv: divide by zero');
+  }
+  return {
+    re: (a.re * b.re + a.im * b.im) / denom,
+    im: (a.im * b.re - a.re * b.im) / denom,
+  };
+}
+
+/** Magnitude |z| of a complex number. */
+export function cabs(z: Complex): number {
+  return Math.hypot(z.re, z.im);
+}
+
+/** Extract the diagonal of a complex CSR matrix (square only). Missing
+ *  diagonals come back as 0. */
+export function cdiagonal(A: ComplexCsrMatrix): Float64Array {
+  if (A.numRows !== A.numCols) {
+    throw new Error(
+      `cdiagonal: matrix must be square, got ${A.numRows}×${A.numCols}`,
+    );
+  }
+  const n = A.numRows;
+  const d = new Float64Array(2 * n);
+  for (let i = 0; i < n; i++) {
+    const start = A.rowPtr[i]!;
+    const end = A.rowPtr[i + 1]!;
+    for (let k = start; k < end; k++) {
+      if (A.colIdx[k]! === i) {
+        d[2 * i] = A.values[2 * k]!;
+        d[2 * i + 1] = A.values[2 * k + 1]!;
+        break;
+      }
+    }
+  }
+  return d;
+}
+
 /** Promote a real CSR matrix to complex storage (imaginary part = 0).
  *  Useful to mix real and complex blocks in PML assemblies without
  *  duplicating the real-valued construction code. */
