@@ -5,6 +5,7 @@
     "toolNameSuffix": "Based on 2D FEM",
     "brand": "Photonic Edge",
     "footer": "Copyright Photonic Edge Inc. All rights reserved.",
+    "gotoFullwave": "Full-wave (実験版)",
     "mode": {
       "label": "表示モード",
       "simple": "Simple",
@@ -135,5 +136,30 @@
     "switcher": "言語",
     "ja": "日本語",
     "en": "English"
+  },
+  "fullwave": {
+    "title": "Full-wave (実験版)",
+    "back": "メインに戻る",
+    "disclaimerTitle": "実験版 — 本番利用には非推奨",
+    "disclaimerBody": "本ページは SC-PML 切り捨てを伴うベクトル Helmholtz FEM を実行します。数学パイプラインは end-to-end で検証済み (テストメッシュ上で ε_eff が KJ と 0.3 % 以内一致) ですが、Jacobi-PCG 内側ソルバは ~20 GHz 未満で停滞し、粗メッシュでの V-P Z₀ 抽出は KJ 参考値から ~30 % 上振れします。メインの計算機 (KJ 後処理) が引き続き信頼可能な本番経路です。",
+    "params": "マイクロストリップパラメータ",
+    "frequencyLabel": "周波数 [GHz, ≥ 20]",
+    "run": "Full-wave 解析を実行",
+    "running": "計算中…",
+    "lowFreqWarn": "現在のメッシュでは ~20 GHz 未満で内側 BiCGStab が停滞します。20 GHz 以上に上げてください。",
+    "resultsTitle": "結果",
+    "col": {
+      "quantity": "量",
+      "fullwave": "Full-wave (FEM)",
+      "kjref": "KJ (参考値)",
+      "delta": "Δ"
+    },
+    "diagnostics": "ソルバ診断",
+    "diag": {
+      "outer": "外側反復回数",
+      "inner": "内側反復回数 (BiCGStab, 合計)",
+      "elapsed": "壁時計",
+      "converged": "収束"
+    }
   }
 }

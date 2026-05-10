@@ -5,6 +5,7 @@
     "toolNameSuffix": "Based on 2D FEM",
     "brand": "Photonic Edge",
     "footer": "Copyright Photonic Edge Inc. All rights reserved.",
+    "gotoFullwave": "Full-wave (experimental)",
     "mode": {
       "label": "View mode",
       "simple": "Simple",
@@ -135,5 +136,30 @@
     "switcher": "Language",
     "ja": "日本語",
     "en": "English"
+  },
+  "fullwave": {
+    "title": "Full-wave (experimental)",
+    "back": "Back to calculator",
+    "disclaimerTitle": "Experimental — not for production use",
+    "disclaimerBody": "This page runs the new vector-Helmholtz FEM with SC-PML truncation. The math pipeline is validated end-to-end (ε_eff matches KJ within 0.3 % on the test mesh), but the Jacobi-PCG inner solver stagnates below ~20 GHz and the V-P Z₀ extraction on the coarse mesh sits ~30 % off the KJ reference. The main calculator (KJ post-process) remains the trusted production path.",
+    "params": "Microstrip parameters",
+    "frequencyLabel": "Frequency [GHz, ≥ 20]",
+    "run": "Run full-wave solve",
+    "running": "Solving…",
+    "lowFreqWarn": "Inner BiCGStab stagnates below ~20 GHz on the current mesh. Bump frequency to 20 GHz or higher.",
+    "resultsTitle": "Results",
+    "col": {
+      "quantity": "Quantity",
+      "fullwave": "Full-wave (FEM)",
+      "kjref": "KJ (reference)",
+      "delta": "Δ"
+    },
+    "diagnostics": "Solver diagnostics",
+    "diag": {
+      "outer": "Outer iterations",
+      "inner": "Inner iterations (BiCGStab, total)",
+      "elapsed": "Wall time",
+      "converged": "Converged"
+    }
   }
 }

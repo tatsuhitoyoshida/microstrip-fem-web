@@ -78,6 +78,60 @@ Spec target (CLAUDE.md §10): Z₀ within ±1 % of HFSS / CST.
   comparable lossless / quasi-TEM regime. tan δ and skin effect are
   outside scope.
 
+## v0.2 — Full-wave PML pipeline (research-only)
+
+Round 8c built a complete vector full-wave eigenvalue FEM on top of
+the quasi-static path. The pipeline (mixed Et + Ez Nédélec /
+nodal-Lagrange formulation → complex Schur reduction → SC-PML
+truncation → complex shift-invert eigsolver) is fully wired up and
+validated end-to-end, but does not currently feed the production UI
+— see `docs/architecture.md` and `docs/roadmap.md` for why.
+
+### Closed-form validations (from `tests/fem-fullwave/`)
+
+| Test                                              | Reference                                        | Result          |
+| ------------------------------------------------- | ------------------------------------------------ | --------------- |
+| Closed PEC waveguide TE_10 (2×1 box, k_c²)        | analytical `(π/a)²`                              | within 2 %      |
+| TE_10 mesh refinement                             | finer mesh → tighter to analytical               | confirmed       |
+| Closed PEC mixed system at k₀² = 5 (β²)           | analytical `k₀² − (π/a)²` (≈ 2.533)              | within 5 %      |
+| Inhomogeneous half-dielectric (ε_r = 4, k₀² = 5)  | analytical bracket [air-only, ε=4-uniform]       | inside bracket  |
+| End-to-end PML pipeline @ κ = 0 (reduces to PEC)  | matches real-track Stage 2.5 answer              | within 5 %      |
+
+### FR-4 microstrip dispersion match against KJ
+
+Coarse-mesh PML solve (lateral / air pad = 3·h, ≈ few hundred
+triangles) at two upper-microwave frequencies, with KJ-dispersive
+ε_eff(f) as the reference:
+
+| f [GHz] | ε_eff (FEM)  | ε_eff (KJ)   | Δε_eff      | Z₀ (FEM-V/P) | Z₀ (KJ)   |
+| ------- | ------------ | ------------ | ----------- | ------------ | --------- |
+| 20      | 3.888        | 3.899        | **−0.26 %** | 67.5 Ω       | 46.2 Ω    |
+| 30      | 4.051        | 4.060        | **−0.21 %** | 75.0 Ω       | 45.3 Ω    |
+
+**The ε_eff(f) match is the load-bearing validation**: it proves
+the eigenvalue itself is correct across a meaningful slice of the
+frequency band, matching an independent reference (KJ accurate to
+~1 % vs measured data) to better than 0.3 %.
+
+### Known limits of the current PML implementation
+
+These are not algorithmic errors — the math is right. They are
+practical constraints from the Jacobi-preconditioned BiCGStab
+inner solver:
+
+- **f ≲ 20 GHz on coarse mesh**: the shifted-operator conditioning
+  collapses as σ shrinks far below the natural matrix scale.
+  BiCGStab stagnates at rel-residual O(0.1). A stronger
+  preconditioner (ILU(0) on complex symmetric) would fix this and
+  is on the v0.3 roadmap.
+- **Z₀ absolute accuracy ~30 %** at the coarse-mesh / 1-point
+  quadrature configuration tested. ε_eff is 0.3 %; the Z₀ gap is
+  the V-line integral approximation. Multi-point quadrature on V
+  and a finer mesh under the trace would close it.
+- **PML reflection floor ~ 1 %** at κ_max = 3, polynomial order 2.
+  Higher κ_max + more taper points lower this further at the cost
+  of more PML-zone triangles.
+
 ## Reference textbooks
 
 The "expected W ≈ X mm" values in

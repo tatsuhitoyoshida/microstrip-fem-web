@@ -10,6 +10,7 @@
 
 import { hammerstadJensen } from '../analytical/hammerstad';
 import { wheeler } from '../analytical/wheeler';
+import { dispersionCorrection } from '../analytical/dispersion';
 import { initMesh } from '../fem/mesh';
 import {
   type AdaptivePassInfo,
@@ -19,6 +20,8 @@ import {
   solveMicrostripAdaptive,
 } from '../fem/tlanalysis';
 import { findOptimalWidth } from '../optimization/bisection';
+import { solveMicrostripPml } from '../fem-fullwave/microstrip-pml';
+import { extractMicrostripZ0 } from '../fem-fullwave/microstrip-z0';
 import type {
   AdaptivePassUpdate,
   ProgressStage,
@@ -26,6 +29,8 @@ import type {
   WorkerResponse,
 } from './messages';
 import type { MicrostripParams } from '../types';
+
+const C_MM_PER_S = 2.998e11;
 
 let initPromise: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
@@ -106,6 +111,75 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>): Promise<void> => {
         hammerstad: hj,
         wheeler: wh,
         paramsUsed: msg.params,
+      });
+      return;
+    }
+
+    if (msg.type === 'fullwave') {
+      progress(id, 'meshing-and-solving');
+      const startedAt = performance.now();
+      const fGHz = msg.frequencyGHz;
+      const k0 = (2 * Math.PI * fGHz * 1e9) / C_MM_PER_S;
+      const k0sq = k0 * k0;
+      const kjStaticEpsEff = hammerstadJensen(msg.params).epsilonEff;
+      const kjStaticZ0 = hammerstadJensen(msg.params).z0;
+      const kjDisp = dispersionCorrection({
+        epsilonR: msg.params.epsilonR,
+        epsilonEffStatic: kjStaticEpsEff,
+        widthMm: msg.params.width,
+        heightMm: msg.params.height,
+        frequencyGHz: fGHz,
+      });
+      const shiftReal = 1.3 * k0sq * kjDisp.epsilonEffF;
+      const shiftImag = 0.3 * k0sq;
+      // Coarse mesh by default; the Jacobi-PCG inner solve cannot
+      // handle a production-density mesh in CI-friendly wall time.
+      // See docs/roadmap.md for the ILU(0) follow-up.
+      const geometry = msg.coarseGeometry !== false
+        ? {
+            lateralPaddingFactor: 3,
+            airPaddingFactor: 3,
+            substrateMaxArea: 0.5,
+            airMaxArea: 1.5,
+          }
+        : {};
+      const eig = await solveMicrostripPml(msg.params, {
+        frequencyGHz: fGHz,
+        geometry,
+        pmlKappaMax: 3,
+        shift: { re: shiftReal, im: shiftImag },
+        outerTol: 1e-3,
+        outerMaxIter: 30,
+        innerTol: 1e-4,
+        innerMaxIter: 30000,
+      });
+      const z = extractMicrostripZ0(eig.mesh, eig.topology, {
+        eFreeEdges: eig.eFreeEdges,
+        eFreeNodes: eig.eFreeNodes,
+        edgePartition: eig.edgePartition,
+        nodePartition: eig.nodePartition,
+        beta2: eig.beta2,
+        k0Squared: eig.k0Squared,
+        frequencyGHz: fGHz,
+        traceWidth: msg.params.width,
+        substrateHeight: msg.params.height,
+        conductorThickness: msg.params.thickness,
+      });
+      const elapsedMs = performance.now() - startedAt;
+      post({
+        id,
+        type: 'fullwave-result',
+        paramsUsed: msg.params,
+        frequencyGHz: fGHz,
+        beta2: eig.beta2,
+        epsilonEff: z.epsilonEff,
+        z0: z.z0,
+        kjReferenceEpsEff: kjDisp.epsilonEffF,
+        kjReferenceZ0: kjStaticZ0 * kjDisp.z0Ratio,
+        outerIterations: eig.outerIterations,
+        innerIterations: eig.innerIterations,
+        converged: eig.converged,
+        elapsedMs,
       });
       return;
     }
