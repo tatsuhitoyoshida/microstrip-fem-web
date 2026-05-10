@@ -235,6 +235,26 @@ export function pmlCouplingWeight(materials: PmlMaterials): AnisoWeight {
   };
 }
 
+/**
+ * Scalar P1 node-mass weight γ(x, y) = ε_r · s_x · s_y.
+ *
+ * This is the zz-component of the effective ε tensor — `ε̃_zz = ε_r ·
+ * (s_x s_y)` — used for the `M_eps_n` block (mass on the longitudinal
+ * E_z scalar field). Distinct from `pmlMassWeight`, which assembles
+ * the *in-plane* `ε̃` tensor for the edge-DoF block.
+ */
+export function pmlNodeMassWeight(materials: PmlMaterials): ComplexScalarWeight {
+  return (regionAttr, x, y) => {
+    const sx = materials.pml.x.s(x);
+    const sy = materials.pml.y.s(y);
+    const eps = materials.epsR(regionAttr);
+    // s_x · s_y (complex multiply)
+    const prodRe = sx.re * sy.re - sx.im * sy.im;
+    const prodIm = sx.re * sy.im + sx.im * sy.re;
+    return { re: eps * prodRe, im: eps * prodIm };
+  };
+}
+
 /** Helper: returns `scalar · (numer / denom)` as a complex number. */
 function cdivScaled(scalar: number, numer: Complex, denom: Complex): Complex {
   // (a + jb) / (c + jd) = ((ac + bd) + j(bc - ad)) / (c² + d²)
