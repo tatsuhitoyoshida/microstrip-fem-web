@@ -42,6 +42,7 @@ import {
   buildGradientDeflator,
 } from '../../src/fem-fullwave/gradient';
 import { shiftInvertEigenvalue } from '../../src/fem-fullwave/eigsolve';
+import type { TriangleWeight } from '../../src/fem-fullwave/assembly';
 import type { Mesh } from '../../src/types';
 
 /**
@@ -84,29 +85,68 @@ function rectangularPecMesh(nx: number, ny: number, a: number, b: number): Mesh 
   };
 }
 
+/**
+ * Same structured PEC mesh as `rectangularPecMesh`, but with triangle
+ * attributes set to `1` for triangles whose centroid lies in the
+ * "dielectric" region (`y < dielectricFraction · b`) and `0` elsewhere.
+ * The caller's `epsilonR` callback decides what those attributes map to.
+ *
+ * For this test the dielectric is the bottom slab: a half-fill (0.5)
+ * gives a textbook partially-loaded LSE/LSM problem.
+ */
+function rectangularPecMeshDielectric(
+  nx: number,
+  ny: number,
+  a: number,
+  b: number,
+  dielectricFraction: number,
+): Mesh {
+  const base = rectangularPecMesh(nx, ny, a, b);
+  const yThreshold = dielectricFraction * b;
+  const attrs = new Float64Array(base.triangleCount);
+  for (let t = 0; t < base.triangleCount; t++) {
+    const v0 = base.triangles[3 * t]!;
+    const v1 = base.triangles[3 * t + 1]!;
+    const v2 = base.triangles[3 * t + 2]!;
+    const cy =
+      (base.vertices[2 * v0 + 1]! +
+        base.vertices[2 * v1 + 1]! +
+        base.vertices[2 * v2 + 1]!) /
+      3;
+    attrs[t] = cy < yThreshold ? 1 : 0;
+  }
+  return { ...base, triangleAttributes: attrs };
+}
+
 interface MixedSolveResult {
   beta2: number;
   outerIterations: number;
 }
 
+interface MixedSolveOptions {
+  epsilonR?: TriangleWeight;
+  muR?: TriangleWeight;
+  /** Inner Schur solver. Use `cg` when K_n is SPD (typically k₀² below
+   *  the loaded TM cutoff), `minres` otherwise. Default `cg`. */
+  innerSolver?: 'cg' | 'minres';
+}
+
 /**
  * Solve the closed PEC waveguide mixed-system eigenvalue problem at a
  * given (k₀², σ) and return the β² closest to σ.
- *
- * Uses CG for the inner Schur K_n solves (assumes `k₀²` is below the
- * smallest TM cutoff so K_n is SPD on the free-node subspace).
  */
 function solveMixedCutoff(
   mesh: Mesh,
   k0Squared: number,
   shift: number,
+  options: MixedSolveOptions = {},
 ): MixedSolveResult {
   const topo = buildEdgeTopology(mesh);
   const numNodes = mesh.vertices.length / 2;
 
   const blocks = assembleMixedBlocks(mesh, topo, {
-    epsilonR: () => 1,
-    muR: () => 1,
+    epsilonR: options.epsilonR ?? (() => 1),
+    muR: options.muR ?? (() => 1),
     k0Squared,
   });
 
@@ -126,7 +166,9 @@ function solveMixedCutoff(
   const CtzFree = restrictRect(blocks.Ctz, edgePartition, nodePartition);
 
   // Schur-complement mass M̃ = M_t − C_tz K_n⁻¹ C_tz^T.
-  const tildeM = assembleSchurMass(MtFree, CtzFree, KnFree, { innerSolver: 'cg' });
+  const tildeM = assembleSchurMass(MtFree, CtzFree, KnFree, {
+    innerSolver: options.innerSolver ?? 'cg',
+  });
 
   // Gradient deflator on the free-edge subspace. Use M_t (the SPD
   // mass) for the inner product — M̃ may be indefinite, M_t isn't.
@@ -184,5 +226,97 @@ describe('Mixed-system waveguide eigensolver — homogeneous closed PEC validati
     const deltaActual = rB.beta2 - rA.beta2;
     const deltaExpected = k0SqB - k0SqA;
     expect(Math.abs(deltaActual - deltaExpected) / deltaExpected).toBeLessThan(0.02);
+  });
+});
+
+describe('Mixed-system waveguide eigensolver — inhomogeneous (dielectric-loaded) PEC validation', () => {
+  it('uniform ε_r = 4 reproduces β² = ε_r k₀² − k_c² (loaded homogeneous limit)', () => {
+    // With ε_r > 1 uniformly, the dispersion of the lowest TE-like mode
+    // becomes β² = ε_r k₀² − k_c²(geom). The k₀² we pick is above the
+    // loaded TM_11 cutoff (= k_c²(TM_11) / ε_r ≈ 12.34 / 4 ≈ 3.08), so
+    // K_n is indefinite and the inner Schur solve must use MINRES.
+    const a = 2;
+    const b = 1;
+    const k0Squared = 5;
+    const eps = 4;
+    const expected = eps * k0Squared - Math.PI ** 2 / 4; // ≈ 17.533
+    const mesh = rectangularPecMesh(13, 7, a, b);
+    const r = solveMixedCutoff(mesh, k0Squared, expected, {
+      epsilonR: () => eps,
+      innerSolver: 'minres',
+    });
+    const relErr = Math.abs(r.beta2 - expected) / expected;
+    expect(relErr).toBeLessThan(0.05);
+  });
+
+  it('half-filled (ε_r = 4 in lower half) β² lies between air and uniform-dielectric limits', () => {
+    // Genuine inhomogeneous case: the coupling block C_tz now
+    // *physically* matters (in homogeneous closed boxes the lowest TE
+    // mode has zero E_z by symmetry; here the dielectric step breaks
+    // that symmetry and the discrete v = E_z is non-trivial).
+    //
+    // We can't quote a textbook β² without the partially-loaded LSE
+    // transcendental, but the bracket
+    //
+    //     β²(air-only)  <  β²(half-filled)  <  β²(uniform ε_r = 4)
+    //
+    // is rigorous: filling more of the cross-section with high-ε
+    // material slows the wave (raises β² at fixed k₀). A solver
+    // delivering anything outside this bracket is numerically wrong.
+    const a = 2;
+    const b = 1;
+    const k0Squared = 5;
+    const eps = 4;
+    const meshAir = rectangularPecMesh(13, 7, a, b);
+    const meshDiel = rectangularPecMesh(13, 7, a, b);
+    const meshHalf = rectangularPecMeshDielectric(13, 7, a, b, 0.5);
+
+    const air = solveMixedCutoff(meshAir, k0Squared, 2.5, {
+      epsilonR: () => 1,
+      innerSolver: 'cg',
+    });
+    const diel = solveMixedCutoff(meshDiel, k0Squared, 17.5, {
+      epsilonR: () => eps,
+      innerSolver: 'minres',
+    });
+    // Pick the shift inside the expected bracket; somewhere around the
+    // arithmetic midpoint is fine and avoids accidentally favouring
+    // either limit.
+    const half = solveMixedCutoff(meshHalf, k0Squared, 9.0, {
+      epsilonR: (attr) => (attr === 1 ? eps : 1),
+      innerSolver: 'minres',
+    });
+
+    expect(half.beta2).toBeGreaterThan(air.beta2);
+    expect(half.beta2).toBeLessThan(diel.beta2);
+    // Sanity bracket on the air / diel limits themselves.
+    expect(Math.abs(air.beta2 - (k0Squared - Math.PI ** 2 / 4))).toBeLessThan(0.5);
+    expect(
+      Math.abs(diel.beta2 - (eps * k0Squared - Math.PI ** 2 / 4)) /
+        (eps * k0Squared - Math.PI ** 2 / 4),
+    ).toBeLessThan(0.05);
+  });
+
+  it('refining the mesh keeps the half-filled β² stable', () => {
+    // Convergence sanity: doubling the resolution shouldn't shift the
+    // recovered β² by more than the FEM error budget on this kind of
+    // discontinuous-coefficient problem (~5 %).
+    const a = 2;
+    const b = 1;
+    const k0Squared = 5;
+    const eps = 4;
+    const meshCoarse = rectangularPecMeshDielectric(11, 6, a, b, 0.5);
+    const meshFine = rectangularPecMeshDielectric(17, 9, a, b, 0.5);
+    const coarse = solveMixedCutoff(meshCoarse, k0Squared, 9.0, {
+      epsilonR: (attr) => (attr === 1 ? eps : 1),
+      innerSolver: 'minres',
+    });
+    const fine = solveMixedCutoff(meshFine, k0Squared, 9.0, {
+      epsilonR: (attr) => (attr === 1 ? eps : 1),
+      innerSolver: 'minres',
+    });
+    // The two answers must agree to a few percent; if the coupling
+    // block were computed wrong they'd typically diverge by >50 %.
+    expect(Math.abs(coarse.beta2 - fine.beta2) / fine.beta2).toBeLessThan(0.05);
   });
 });
