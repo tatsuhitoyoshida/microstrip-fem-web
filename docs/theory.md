@@ -208,13 +208,130 @@ The Phase 3 / 4 / 5 completion tests live alongside the code:
 For the larger external-reference picture (HFSS / CST / Pozar), see
 [`validation.md`](./validation.md).
 
-## 12. Where this stops (v0.1 scope)
+## 12. Where this stops (v0.1 scope, retained as production path)
 
 - No losses (tan δ, skin effect, surface roughness).
-- No dispersion: quasi-static, frequency-independent.
+- No dispersion: quasi-static, frequency-independent (KJ post-process
+  handles the displayed Z₀(f) dispersion correction).
 - Single-ended microstrip only — no differential, CPW, stripline.
 - Single substrate layer.
 
-These are conscious omissions to keep the v0.1 surface honest. See
-[CLAUDE.md §12](../CLAUDE.md) for the long list and the rationale for
-deferring them.
+These are conscious omissions for the **main calculator**. v0.2 added
+a research-grade full-wave eigenvalue FEM that lifts the dispersion
+limit (see §13 below); it's exposed via a separate experimental page
+rather than replacing the v0.1 path.
+
+## 13. v0.2 — full-wave eigenvalue FEM (experimental page)
+
+The full-wave path lives under `src/fem-fullwave/` and is reachable
+from the "Full-wave (experimental)" page. It solves the mixed
+(E_t, E_z) vector-Helmholtz eigenvalue problem on a microstrip
+cross-section with an SC-PML truncation, recovering the complex
+propagation constant β² directly from Maxwell rather than via a
+closed-form correction. End-to-end validation: ε_eff(FEM) matches
+KJ to within 0.3 % at f = 20 / 30 GHz on FR-4 — see
+[`validation.md`](./validation.md). The inner solver isn't yet
+production-ready; the gating items are in [`roadmap.md`](./roadmap.md).
+
+### 13.1 Formulation
+
+For a guided wave with `exp(−jβz)` propagation in a 2-D cross-
+section, substituting `∂_z → −jβ` into ∇ × (μ_r⁻¹ ∇ × E) = k₀² ε_r E
+and testing with conjugated test functions gives, after the standard
+cross-product expansion:
+
+```
+  ∫ μ_r⁻¹ (curl_t E_t)(curl_t F_t)*  +  ∫ μ_r⁻¹ ∇E_z · ∇F_z*
+  − k₀² ∫ ε_r (E_t · F_t* + E_z F_z*)
+  − jβ ∫ μ_r⁻¹ (∇E_z · F_t* − E_t · ∇F_z*)
+  = − β² ∫ μ_r⁻¹ E_t · F_t*.
+```
+
+The `−jβ` coupling makes this formally quadratic in β. Block-
+decomposing on (u, v) = (E_t, E_z), eliminating v from the node
+equation, and folding the `−jβ × −jβ = β²` collapse leaves a
+**linear generalised eigenvalue problem** on the edge DoFs alone:
+
+```
+  K_t u  =  β² M̃ u,    M̃ = M_t − C_tz K_n⁻¹ C_tz^T.
+```
+
+This is the Schur reduction implemented in `mixed-assembly.ts` /
+`schur.ts` (real path) and `mixed-pml-assembly.ts` /
+`complex-schur.ts` (PML path).
+
+### 13.2 Discrete spaces
+
+- **E_t** lives in the Whitney 1-form / Nédélec edge space on
+  triangles. The basis function for the edge from vertex `a` to
+  vertex `b` is `N_{ab} = λ_a ∇λ_b − λ_b ∇λ_a`, which is
+  curl-conforming and gives globally-tangentially-continuous fields
+  without forcing normal continuity. 1 DoF per edge, 3 per
+  triangle.
+
+- **E_z** lives in the standard P1 nodal Lagrange space — same one
+  the quasi-static path uses for φ.
+
+- The discrete gradient operator **G** maps a nodal scalar to its
+  edge-DoF gradient. `K_curl · G f = 0` is exact to floating-point
+  precision — the discrete curl-grad identity that makes the
+  Nédélec construction what it is. The deflator built from G
+  filters out the (otherwise spurious) gradient subspace from the
+  eigensolver.
+
+### 13.3 SC-PML
+
+The Berenger / Taflove stretched-coordinate PML replaces
+`∂/∂x → (1/s_x) ∂/∂x` with `s_x = 1 − jκ_x(x)/ω`. Pulling the s
+factors through the curl operator yields effective anisotropic
+material tensors:
+
+```
+  ε̃     = ε_r · diag(s_y/s_x, s_x/s_y, s_x s_y)
+  1/μ̃  = (1/μ_r) · diag(s_y/s_x, s_x/s_y, 1/(s_x s_y))   (zz: K_curl
+                                                            coefficient)
+```
+
+`pml.ts` produces the per-triangle scalar / tensor weights that the
+anisotropic complex assembly modules consume. A polynomial taper
+keeps the inner PML boundary reflection-free in the continuous
+limit.
+
+### 13.4 Eigensolver
+
+The complex matrix system is **complex symmetric** (A = Aᵀ, but
+A ≠ A^H — PML deliberately breaks Hermitian symmetry). The standard
+Hermitian Krylov methods (CG, MINRES) decouple their convergence
+guarantees from the actual residual norm on complex symmetric
+problems, so the inner linear solves go through **complex
+Bi-CGSTAB** (Jacobi-preconditioned) and the outer eigsolver is
+shift-invert power iteration on the bilinear Rayleigh quotient. See
+`complex-eigsolve.ts` for the careful split between bilinear `cdot`
+(eigenvalue) and Hermitian `cdotH` (norms / convergence) inner
+products.
+
+### 13.5 ε_eff and Z₀ from the eigenpair
+
+```
+  ε_eff(f) = β² / k₀²                                 (complex)
+  V        = ∫_0^h E_y dy at x = 0                    (line integral)
+  P        = ½ Re ∫ (E × H*)_z dA                     (Poynting flux)
+  Z₀       = |V|² / (2 P)                              (V-P definition)
+```
+
+H is recovered from Maxwell with `exp(−jβz)`:
+`H_t = (β/ωμ)(ẑ × E_t) + (j/ωμ)(∇E_z × ẑ)`. The V-P pairing (rather
+than V-I or P-I) is chosen because V is a single 1-D line integral
+and P is path-independent — both natural to evaluate from the FEM
+eigenvector. See `microstrip-z0.ts`.
+
+### 13.6 Why this isn't the main calculator yet
+
+The inner Bi-CGSTAB stagnates whenever the shifted operator
+`K_t − σ M̃` lives orders of magnitude below the natural matrix
+scale (i.e. low frequencies), and the V-P Z₀ extraction with
+1-point quadrature on a coarse mesh sits ~30 % above KJ. Both are
+addressable with the items in [`roadmap.md`](./roadmap.md) — an
+ILU(0) preconditioner closes the convergence floor, multi-point
+quadrature + finer mesh closes the Z₀ gap. Once those land, the
+experimental page graduates.

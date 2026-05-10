@@ -1,11 +1,17 @@
 # microstrip-fem-web
 
-A 2-D quasi-static finite-element method (FEM) solver for microstrip
-characteristic impedance Z₀, running entirely in the browser.
+A finite-element method (FEM) solver for microstrip characteristic
+impedance Z₀, running entirely in the browser.
 
-> **Status**: v0.1 — feature-complete, awaiting external HFSS/CST
-> validation and corporate styling pass before public launch at
-> `tools.photonic-edge.com`.
+> **Status**: v0.2 — quasi-static FEM + Kirschning–Jansen dispersion
+> correction is the production calculator (v0.1 path, validated within
+> 2 % of Hammerstad–Jensen). A research-grade vector full-wave
+> (Nédélec edge elements + SC-PML truncation) eigensolver also ships,
+> reachable from the **Full-wave (experimental)** page. Both math
+> pipelines are end-to-end tested; see
+> [`docs/roadmap.md`](docs/roadmap.md) for the gating work
+> (ILU(0) preconditioner, V-P quadrature) that would let the
+> full-wave path replace the KJ post-process in the main calculator.
 
 [日本語版 README](./README.ja.md)
 
@@ -18,7 +24,9 @@ they drift silently. This tool runs a real PDE solve in the browser, so
 the accuracy is governed by the mesh — which we control — rather than
 by the regime the formula was fitted for.
 
-## Features (v0.1)
+## Features
+
+### Main calculator (production, v0.1 + v0.2 KJ post-process)
 
 - 2-D quasi-static FEM with linear T3 elements, ~50 k triangles per
   solve by default
@@ -28,16 +36,36 @@ by the regime the formula was fitted for.
   TypeScript
 - Forward calculation: enter geometry → get Z₀, ε_eff, |E| heatmap
 - Inverse design: enter target Z₀ → bisection finds the trace width that
-  hits it
+  hits it. The bisection is frequency-aware: at f > 0 it targets the
+  Kirschning–Jansen-corrected Z₀(f) so the hero number matches.
 - Side-by-side comparison against Hammerstad–Jensen and Wheeler / Pozar
   closed forms
+- Z₀(f) frequency-response chart with KJ-dispersive overlay
 - Interactive cross-section plot with conductor, ground plane, and the
   substrate–air interface clearly marked
 - mm / mil unit toggle
 - Bilingual UI (Japanese / English) with URL prefix-based language
   detection (`/ja/`, `/en/`)
 - All compute is offloaded to a Web Worker so the UI never blocks
-- Plotly is loaded lazily — initial JS payload is ~88 kB gzipped
+- Plotly is loaded lazily — initial JS payload is ~96 kB gzipped
+
+### Full-wave page (experimental, v0.2)
+
+Available from the **Full-wave (experimental)** button in the header.
+Solves the vector-Helmholtz eigenvalue problem on the microstrip
+cross-section with an SC-PML truncation, recovering β² directly from
+Maxwell. End-to-end validated: ε_eff(FEM) matches the KJ-dispersive
+reference to within 0.3 % at f = 20 / 30 GHz on FR-4.
+
+- Mixed (E_t, E_z) Nédélec / nodal-Lagrange formulation
+- Stretched-coordinate PML for open-domain truncation
+- Complex symmetric Bi-CGSTAB inner solver + shift-invert outer eigsolver
+- ε_eff(f), Z₀ (V-P definition), β² shown side-by-side with KJ reference
+
+Not yet in the main calculator: the Jacobi-PCG inner solver stagnates
+below ~20 GHz, the V-P Z₀ extraction on the coarse mesh is ~30 % above
+KJ. See [`docs/roadmap.md`](docs/roadmap.md) for the gating work and
+[`docs/theory.md` §13](docs/theory.md) for the derivation.
 
 ## Quick start
 
