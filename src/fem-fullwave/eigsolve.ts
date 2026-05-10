@@ -101,10 +101,13 @@ export function smallestGeneralizedEigenvalue(
   B: CsrMatrix,
   options: SmallestEigenOptions = {},
 ): SmallestEigenResult {
-  if (A.n !== B.n) {
-    throw new Error(`smallestGeneralizedEigenvalue: A is ${A.n}×${A.n}, B is ${B.n}×${B.n}`);
+  if (A.numRows !== A.numCols || B.numRows !== B.numCols || A.numRows !== B.numRows) {
+    throw new Error(
+      `smallestGeneralizedEigenvalue: A is ${A.numRows}×${A.numCols}, ` +
+        `B is ${B.numRows}×${B.numCols}; both must be square and same size`,
+    );
   }
-  const n = A.n;
+  const n = A.numRows;
   const tol = options.tol ?? 1e-9;
   const maxIter = options.maxIter ?? 100;
   const innerTol = options.innerTol ?? 1e-10;

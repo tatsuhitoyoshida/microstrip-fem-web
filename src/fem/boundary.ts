@@ -42,8 +42,10 @@ export function applyDirichletElimination(
   dirichletForMarker: DirichletForMarker,
 ): AppliedBc {
   const n = mesh.vertexMarkers.length;
-  if (K.n !== n) {
-    throw new Error(`applyDirichletElimination: K is ${K.n}×${K.n} but mesh has ${n} vertices`);
+  if (K.numRows !== n || K.numCols !== n) {
+    throw new Error(
+      `applyDirichletElimination: K is ${K.numRows}×${K.numCols} but mesh has ${n} vertices`,
+    );
   }
 
   const isDirichlet = new Uint8Array(n);

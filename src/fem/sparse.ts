@@ -9,25 +9,39 @@
  *     {@link spmv} (sparse matrix-vector product).
  *   - Pure TypeScript — no native or WASM dependency. The microstrip FEM
  *     scale (~10k DOF) makes this perfectly adequate.
+ *
+ * **Rectangular matrices** (Round 8c): the type was originally pinned to
+ * square matrices via a single `n` field. Vector full-wave's edge-node
+ * coupling block (`A_tz` with `numEdges` rows and `numNodes` columns)
+ * forced a generalisation to `numRows × numCols`. Square matrices stay
+ * convenient — `CooBuilder(n)` defaults `numCols = n`, and `spmv`
+ * autodetects from `numCols` how long the input vector should be.
  */
 
-/** Compressed Sparse Row representation of an N × N matrix. */
+/** Compressed Sparse Row representation of a numRows × numCols matrix. */
 export interface CsrMatrix {
-  n: number;
-  rowPtr: Int32Array; // length n + 1
+  numRows: number;
+  numCols: number;
+  rowPtr: Int32Array; // length numRows + 1
   colIdx: Int32Array; // length nnz
   values: Float64Array; // length nnz
 }
 
 /** Triplet accumulator for element-by-element assembly. */
 export class CooBuilder {
-  readonly n: number;
+  readonly numRows: number;
+  readonly numCols: number;
   private readonly rows: number[] = [];
   private readonly cols: number[] = [];
   private readonly vals: number[] = [];
 
-  constructor(n: number) {
-    this.n = n;
+  /**
+   * @param numRows Number of rows in the eventual matrix.
+   * @param numCols Number of columns. Defaults to `numRows` (square).
+   */
+  constructor(numRows: number, numCols?: number) {
+    this.numRows = numRows;
+    this.numCols = numCols ?? numRows;
   }
 
   /** Push a single (i, j, value) triplet. Duplicates are summed at compaction. */
@@ -39,23 +53,24 @@ export class CooBuilder {
 
   /** Compact triplets into a sorted, duplicate-summed CSR matrix. */
   toCsr(): CsrMatrix {
-    const n = this.n;
+    const numRows = this.numRows;
+    const numCols = this.numCols;
     const nnzRaw = this.rows.length;
 
     // count non-zeros per row
-    const rowPtr = new Int32Array(n + 1);
+    const rowPtr = new Int32Array(numRows + 1);
     for (let k = 0; k < nnzRaw; k++) {
       const idx = this.rows[k]! + 1;
       rowPtr[idx] = rowPtr[idx]! + 1;
     }
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < numRows; i++) {
       rowPtr[i + 1] = rowPtr[i + 1]! + rowPtr[i]!;
     }
 
     // bucket triplets by row (raw, with duplicates)
     const rawCol = new Int32Array(nnzRaw);
     const rawVal = new Float64Array(nnzRaw);
-    const rowFill = new Int32Array(n);
+    const rowFill = new Int32Array(numRows);
     for (let k = 0; k < nnzRaw; k++) {
       const r = this.rows[k]!;
       const dest = rowPtr[r]! + rowFill[r]!;
@@ -67,8 +82,8 @@ export class CooBuilder {
     // For each row, sort by column and merge duplicates.
     const finalCol: number[] = [];
     const finalVal: number[] = [];
-    const finalRowPtr = new Int32Array(n + 1);
-    for (let r = 0; r < n; r++) {
+    const finalRowPtr = new Int32Array(numRows + 1);
+    for (let r = 0; r < numRows; r++) {
       const start = rowPtr[r]!;
       const end = rowPtr[r + 1]!;
       const indices: number[] = [];
@@ -89,10 +104,11 @@ export class CooBuilder {
         }
       }
     }
-    finalRowPtr[n] = finalCol.length;
+    finalRowPtr[numRows] = finalCol.length;
 
     return {
-      n,
+      numRows,
+      numCols,
       rowPtr: finalRowPtr,
       colIdx: Int32Array.from(finalCol),
       values: Float64Array.from(finalVal),
@@ -100,10 +116,16 @@ export class CooBuilder {
   }
 }
 
-/** y ← A · x. Allocates `y` if `out` not supplied. */
+/**
+ * y ← A · x. Allocates `y` (length `A.numRows`) if `out` is not
+ * supplied. The input `x` must have length `A.numCols`.
+ */
 export function spmv(A: CsrMatrix, x: Float64Array, out?: Float64Array): Float64Array {
-  const y = out ?? new Float64Array(A.n);
-  for (let i = 0; i < A.n; i++) {
+  if (x.length !== A.numCols) {
+    throw new Error(`spmv: A is ${A.numRows}×${A.numCols} but x has length ${x.length}`);
+  }
+  const y = out ?? new Float64Array(A.numRows);
+  for (let i = 0; i < A.numRows; i++) {
     let s = 0;
     const start = A.rowPtr[i]!;
     const end = A.rowPtr[i + 1]!;
@@ -115,10 +137,39 @@ export function spmv(A: CsrMatrix, x: Float64Array, out?: Float64Array): Float64
   return y;
 }
 
-/** Extract the diagonal as a dense vector. Missing diagonals are 0. */
+/**
+ * y ← Aᵀ · x. Useful for rectangular blocks (e.g. vector full-wave's
+ * `A_zt = A_tzᵀ` edge-node coupling) where we want both A·x and Aᵀ·y
+ * matvecs without storing the transpose explicitly.
+ *
+ * Allocates `y` (length `A.numCols`) if `out` is not supplied. Input
+ * `x` must have length `A.numRows`.
+ */
+export function spmvT(A: CsrMatrix, x: Float64Array, out?: Float64Array): Float64Array {
+  if (x.length !== A.numRows) {
+    throw new Error(`spmvT: A is ${A.numRows}×${A.numCols} but x has length ${x.length}`);
+  }
+  const y = out ?? new Float64Array(A.numCols);
+  if (out !== undefined) y.fill(0);
+  for (let i = 0; i < A.numRows; i++) {
+    const xi = x[i]!;
+    const start = A.rowPtr[i]!;
+    const end = A.rowPtr[i + 1]!;
+    for (let k = start; k < end; k++) {
+      y[A.colIdx[k]!] = y[A.colIdx[k]!]! + A.values[k]! * xi;
+    }
+  }
+  return y;
+}
+
+/** Extract the diagonal as a dense vector. Missing diagonals are 0. Square only. */
 export function diagonal(A: CsrMatrix): Float64Array {
-  const d = new Float64Array(A.n);
-  for (let i = 0; i < A.n; i++) {
+  if (A.numRows !== A.numCols) {
+    throw new Error(`diagonal: matrix must be square, got ${A.numRows}×${A.numCols}`);
+  }
+  const n = A.numRows;
+  const d = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
     const start = A.rowPtr[i]!;
     const end = A.rowPtr[i + 1]!;
     for (let k = start; k < end; k++) {
@@ -154,7 +205,8 @@ export function addToDiagonal(A: CsrMatrix, indices: ArrayLike<number>, delta: n
 /** Deep copy a CSR matrix. */
 export function cloneCsr(A: CsrMatrix): CsrMatrix {
   return {
-    n: A.n,
+    numRows: A.numRows,
+    numCols: A.numCols,
     rowPtr: new Int32Array(A.rowPtr),
     colIdx: new Int32Array(A.colIdx),
     values: new Float64Array(A.values),

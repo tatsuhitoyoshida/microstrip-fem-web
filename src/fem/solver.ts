@@ -49,7 +49,10 @@ export interface CgResult {
  * conjugate gradients.
  */
 export function solveCgJacobi(K: CsrMatrix, b: Float64Array, options: CgOptions = {}): CgResult {
-  const n = K.n;
+  if (K.numRows !== K.numCols) {
+    throw new Error(`solveCgJacobi: matrix must be square, got ${K.numRows}×${K.numCols}`);
+  }
+  const n = K.numRows;
   if (b.length !== n) {
     throw new Error(`solveCgJacobi: K is ${n}×${n} but b has length ${b.length}`);
   }

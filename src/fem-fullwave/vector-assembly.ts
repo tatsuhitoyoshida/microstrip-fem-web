@@ -147,3 +147,62 @@ export function uniformFieldDofs(
   }
   return dofs;
 }
+
+/**
+ * Assemble the **edge-node coupling** matrix
+ *
+ *     C[e, n]  =  ∫_Ω α · N_e · ∇φ_n  dA
+ *
+ * where `N_e` is the (oriented) global Whitney 1-form on edge `e` and
+ * `φ_n` is the P1 nodal hat function at vertex `n`. Result is a
+ * rectangular CSR with `numEdges` rows and `numNodes` columns; this is
+ * the off-diagonal block (`A_tz`) of the mixed Et + Hz formulation.
+ *
+ * Per-element math: ∇φ_n is constant on a triangle, and Whitney
+ * 1-form integrals over a triangle reduce to barycentric averages —
+ *
+ *     ∫_T N_k dA  =  (A/3)(∇λ_{k+2} − ∇λ_{k+1})
+ *
+ * (with k+1, k+2 mod 3). Dotting against ∇φ_l = ∇λ_l gives the local
+ * (3 edges × 3 nodes) coupling block; orientation signs handle sign
+ * agreement with the global edge tangent.
+ */
+export function assembleEdgeNodeCoupling(
+  mesh: Mesh,
+  topology: EdgeTopology,
+  weight: TriangleWeight,
+): CsrMatrix {
+  const numNodes = mesh.vertices.length / 2;
+  const builder = new CooBuilder(topology.numEdges, numNodes);
+
+  for (let t = 0; t < mesh.triangleCount; t++) {
+    const v0 = mesh.triangles[3 * t]!;
+    const v1 = mesh.triangles[3 * t + 1]!;
+    const v2 = mesh.triangles[3 * t + 2]!;
+    const verts: [number, number, number] = [v0, v1, v2];
+    const [x0, y0] = vertexXY(mesh, v0);
+    const [x1, y1] = vertexXY(mesh, v1);
+    const [x2, y2] = vertexXY(mesh, v2);
+    const geom = triangleGeom(x0, y0, x1, y1, x2, y2);
+    const alpha = weight(mesh.triangleAttributes[t]!);
+    const aThird = geom.area / 3;
+
+    for (let k = 0; k < 3; k++) {
+      const er = topology.tri2edge[3 * t + k]!;
+      const sr = topology.tri2edgeSign[3 * t + k]!;
+      // Edge k: N_k = λ_a ∇λ_b − λ_b ∇λ_a, with (a, b) = ((k+1)%3, (k+2)%3).
+      const a = (k + 1) % 3;
+      const b = (k + 2) % 3;
+      const dbx = geom.bs[b]! - geom.bs[a]!;
+      const dby = geom.cs[b]! - geom.cs[a]!;
+      for (let l = 0; l < 3; l++) {
+        const vl = verts[l]!;
+        const gradDot = dbx * geom.bs[l]! + dby * geom.cs[l]!;
+        // (A/3) · (∇λ_b − ∇λ_a) · ∇λ_l, with sign sr from orientation.
+        builder.add(er, vl, alpha * sr * aThird * gradDot);
+      }
+    }
+  }
+
+  return builder.toCsr();
+}

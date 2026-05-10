@@ -23,7 +23,8 @@ describe('CooBuilder.toCsr', () => {
     b.add(1, 0, 1);
     b.add(2, 2, 4);
     const A = b.toCsr();
-    expect(A.n).toBe(3);
+    expect(A.numRows).toBe(3);
+    expect(A.numCols).toBe(3);
     expect(Array.from(A.rowPtr)).toEqual([0, 2, 4, 5]);
     expect(Array.from(A.colIdx)).toEqual([0, 2, 0, 1, 2]);
     expect(Array.from(A.values)).toEqual([2, 1, 1, 3, 4]);

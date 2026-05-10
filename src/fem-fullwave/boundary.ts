@@ -62,9 +62,12 @@ export function partitionDirichlet(
  * (the operation is the same on both axes).
  */
 export function restrictToFree(A: CsrMatrix, partition: DirichletPartition): CsrMatrix {
+  if (A.numRows !== A.numCols) {
+    throw new Error(`restrictToFree: matrix must be square, got ${A.numRows}×${A.numCols}`);
+  }
   const nFree = partition.freeIndices.length;
   const builder = new CooBuilder(nFree);
-  for (let i = 0; i < A.n; i++) {
+  for (let i = 0; i < A.numRows; i++) {
     const fi = partition.freeOf[i]!;
     if (fi === -1) continue;
     for (let k = A.rowPtr[i]!; k < A.rowPtr[i + 1]!; k++) {
