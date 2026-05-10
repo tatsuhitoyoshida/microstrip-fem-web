@@ -25,7 +25,9 @@
     "format:check": "prettier --check .",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "postinstall": "node scripts/install-triangle-wasm.mjs",
+    "install:triangle-wasm": "node scripts/install-triangle-wasm.mjs"
   },
   "dependencies": {
     "i18next": "^26.0.10",

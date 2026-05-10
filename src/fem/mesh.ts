@@ -63,6 +63,10 @@ export function meshFromPslg(pslg: Pslg, options: MeshOptions = {}): Mesh {
     quality: options.minAngleDeg ?? 25,
     area: options.maxArea ?? true,
     regionAttr: true,
+    // Triangle's `-n`: emit neighborlist (3 ints/triangle, -1 for boundary
+    // edges). Required by the adaptive error indicator (`errorIndicator.ts`)
+    // for D-jump computation across triangle edges.
+    neighbors: true,
     quiet: true,
   };
 
@@ -80,11 +84,18 @@ export function meshFromPslg(pslg: Pslg, options: MeshOptions = {}): Mesh {
     Triangle.triangulate(switches, input, output);
 
     // Triangle-wasm returns subarray views into WASM heap; copy them out
-    // before freeIO so the data survives.
+    // before freeIO so the data survives. At very large input sizes
+    // Triangle occasionally bails out internally and leaves the output
+    // pointers null — surface that explicitly so the adaptive loop can
+    // catch it and stop refining gracefully.
+    if (!output.pointlist) {
+      throw new Error('triangle-wasm returned a null mesh (likely too large)');
+    }
     const vertices = Float64Array.from(output.pointlist);
     const triangles = Int32Array.from(output.trianglelist ?? []);
     const triangleAttributes = Float64Array.from(output.triangleattributelist ?? []);
     const vertexMarkers = Int32Array.from(output.pointmarkerlist ?? []);
+    const neighborList = Int32Array.from(output.neighborlist ?? []);
 
     if (triangles.length === 0) {
       throw new Error('triangle-wasm produced an empty mesh');
@@ -97,6 +108,7 @@ export function meshFromPslg(pslg: Pslg, options: MeshOptions = {}): Mesh {
       triangles,
       triangleAttributes,
       vertexMarkers,
+      neighborList,
       minAngleDeg,
       triangleCount: triangles.length / 3,
     };

@@ -92,6 +92,12 @@ export interface Mesh {
   triangleAttributes: Float64Array;
   /** Marker per vertex (Marker value) */
   vertexMarkers: Int32Array;
+  /**
+   * Triangle-adjacency: for triangle t, neighbors of edge opposite vertex k
+   * are stored at neighborList[3*t + k]. Boundary edges yield -1.
+   * Populated when the mesh was generated with `neighbors: true`.
+   */
+  neighborList: Int32Array;
   /** Diagnostics: minimum interior angle of any triangle [deg] */
   minAngleDeg: number;
   /** Diagnostics: number of triangles */

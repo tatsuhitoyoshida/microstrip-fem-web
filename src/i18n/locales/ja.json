@@ -1,7 +1,26 @@
 {
   "app": {
-    "title": "マイクロストリップ FEM",
-    "brand": "Photonic Edge"
+    "title": "Photonics & Electromagnetics Toolkit",
+    "toolNameMain": "Microstrip Line Calculator",
+    "toolNameSuffix": "Based on 2D FEM",
+    "brand": "Photonic Edge",
+    "footer": "Copyright Photonic Edge Inc. All rights reserved.",
+    "mode": {
+      "label": "表示モード",
+      "simple": "Simple",
+      "advanced": "Advanced"
+    }
+  },
+  "whatIs": {
+    "title": "What is this and How to use",
+    "intro": "マイクロストリップラインの特性インピーダンス Z₀、もしくは線路幅をブラウザ上で求めるツールです。",
+    "accuracy": "従来のオンライン計算ツールは近似式によるため、微妙に誤差がありました。本ツールでは 2 次元有限要素法により高精度な計算を目指しています。",
+    "usage": "まず基板パラメータを入力してください。線路幅を指定すれば Z₀ を自動計算し、目標 Z₀ を入力すれば線路幅を二分法で自動探索します。",
+    "local": "ローカルで動作するため、計算中は CPU/メモリを多めに使いますのでご了承ください。詳細は <detail>こちら</detail>。"
+  },
+  "geometry": {
+    "ariaLabel": "マイクロストリップ線路 断面構造の参照図",
+    "ground": "GND"
   },
   "form": {
     "title": "パラメータ",
@@ -10,10 +29,22 @@
     "height": "基板厚 h [{{unit}}]",
     "thickness": "導体厚 t [{{unit}}]",
     "epsilonR": "比誘電率 εr",
+    "frequency": "周波数 [GHz]",
     "targetZ0": "目標 Z₀ [Ω]",
+    "tolerancePct": "公差 ± [%]",
+    "layerStackLegend": "基板パラメータ",
+    "forwardLegend": "線路幅 → Z₀ を計算",
+    "inverseLegend": "目標 Z₀ から線路幅を探索",
     "calculate": "計算",
-    "findW": "目標 Z₀ から W を逆算",
-    "findWTooltip": "FEM で Z₀(W) の二分法探索"
+    "findW": "探索",
+    "findWTooltip": "FEM で Z₀(W) の二分法探索",
+    "adaptiveLegend": "アダプティブメッシュ",
+    "adaptiveEnable": "解の変化が大きい場所を自動細分化",
+    "adaptiveTolerance": "収束しきい値 ΔZ₀ [Ω]",
+    "adaptiveHint": "粗いメッシュで解いて誤差の大きい三角形を反復的に細分化します。OFF にすると固定メッシュ 1 回で解きます。",
+    "adaptiveAdvanced": "詳細設定",
+    "adaptiveMaxPasses": "最大パス数",
+    "adaptiveAdvancedHint": "メッシュ上限(~300k 三角形)に達するまで反復します。"
   },
   "results": {
     "title": "結果",
@@ -21,35 +52,65 @@
     "progress": {
       "init": "メッシュエンジン読み込み中…",
       "meshing-and-solving": "メッシュ生成 + FEM 計算中…",
-      "searching": "最適 W を探索中…"
+      "searching": "最適 W を探索中…",
+      "adaptive-pass": "アダプティブ細分化中…",
+      "adaptive-pass-detail": "Pass {{pass}}: {{triangles}} 三角形, Z₀ = {{z0}} Ω"
     },
     "empty": "パラメータを設定して「計算」を押してください。",
     "errorPrefix": "エラー: {{message}}",
-    "z0": "Z₀",
-    "epsilonEff": "ε_eff",
+    "z0": "特性インピーダンス Z₀",
+    "heroW": "最適線路幅 W",
+    "epsilonEff": "実効比誘電率 ε_eff",
+    "z0Static": "静的 Z₀ (FEM, f→0)",
+    "epsilonEffStatic": "静的 ε_eff (FEM, f→0)",
+    "dispersionDelta": "分散補正量 ΔZ₀",
     "solvedAt": "解いた W",
     "optimalW": "最適 W(二分法)",
+    "targetBandLabel": "目標バンド",
+    "targetBandValue": "{{low}} – {{high}} Ω ({{target}} ± {{pct}} %)",
     "capacitance": "C",
     "vacuumCapacitance": "C₀(真空)",
-    "diagnostics": "メッシュ: {{triangles}} 三角形 · CG 反復: {{withDielectric}}(誘電体) / {{vacuum}}(真空)"
+    "diagnostics": "メッシュ: {{triangles}} 三角形 · CG 反復: {{withDielectric}}(誘電体) / {{vacuum}}(真空)",
+    "adaptive": {
+      "title": "アダプティブ収束履歴 ({{passes}} パス)",
+      "pass": "Pass",
+      "triangles": "三角形数",
+      "z0": "Z₀ [Ω]",
+      "deltaZ0": "Δ Z₀ [Ω]",
+      "view": "表示",
+      "viewing": "表示中",
+      "viewTooltip": "このパスのメッシュ + |E| をヒートマップに表示",
+      "reset": "最終結果に戻す",
+      "stopReason": {
+        "converged": "✓ 収束しました(ΔZ₀ がしきい値を下回った)",
+        "maxPasses": "● 最大パス数に到達しました(必要なら詳細設定から増やせます)",
+        "triangleCeiling": "● メッシュ上限(~300k 三角形)に達したため打ち切り。Triangle 内部の限界です。",
+        "noRefinementCandidates": "● 細分化候補が無くなりました(η² が全てゼロ)"
+      }
+    }
   },
   "comparison": {
-    "title": "比較",
-    "empty": "まだ結果がありません。",
-    "method": "計算法",
-    "z0": "Z₀ [Ω]",
-    "epsilonEff": "ε_eff",
-    "delta": "Δ Z₀ vs FEM",
     "fem": "FEM",
     "hammerstad": "Hammerstad–Jensen",
     "wheeler": "Wheeler / Pozar"
   },
+  "sweep": {
+    "title": "Z₀ 周波数特性",
+    "startGHz": "開始 [GHz]",
+    "stopGHz": "終了 [GHz]",
+    "xAxis": "周波数 [GHz]",
+    "yAxis": "Z₀ [Ω]",
+    "empty": "計算後にグラフが描画されます。",
+    "note": "全曲線に Kirschning–Jansen 分散補正を適用しています。"
+  },
   "plot": {
+    "panelTitle": "電磁界分布",
     "title": "断面 · |E| ヒートマップ",
     "xAxis": "x [mm]",
     "yAxis": "y [mm]",
-    "colorbar": "|E| [V/長さ]",
+    "colorbar": "|E| [dB·V/m]",
     "empty": "まだメッシュがありません。",
+    "working": "計算中…",
     "conductor": "導体",
     "ground": "接地面",
     "interface": "基板 / 空気 界面",

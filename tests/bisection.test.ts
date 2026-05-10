@@ -11,7 +11,9 @@
 
 import { describe, expect, it, beforeAll } from 'vitest';
 import path from 'node:path';
+import { dispersionCorrection } from '../src/analytical/dispersion';
 import { initMesh } from '../src/fem/mesh';
+import { solveMicrostrip } from '../src/fem/tlanalysis';
 import { findOptimalWidth, inverseHammerstadJensen } from '../src/optimization/bisection';
 import { hammerstadJensen } from '../src/analytical/hammerstad';
 
@@ -48,10 +50,12 @@ describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
   });
 
   it('FR-4 50 Ω target → recovers W with |Z₀ − 50| < 0.05 Ω', () => {
+    // Phase 5 spec is an explicit absolute Ω tolerance; pass it directly so
+    // the test isn't coupled to the default tolerancePct (now 1 %).
     const result = findOptimalWidth(
       50,
       { height: 1.6, thickness: 0.035, epsilonR: 4.4 },
-      { solveOptions: COARSE_SOLVE_OPTIONS },
+      { solveOptions: COARSE_SOLVE_OPTIONS, tolerance: 0.05 },
     );
 
     console.log(
@@ -71,7 +75,7 @@ describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
     const result = findOptimalWidth(
       50,
       { height: 0.787, thickness: 0.018, epsilonR: 2.2 },
-      { solveOptions: COARSE_SOLVE_OPTIONS },
+      { solveOptions: COARSE_SOLVE_OPTIONS, tolerance: 0.05 },
     );
 
     console.log(
@@ -87,10 +91,33 @@ describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
     const result = findOptimalWidth(
       75,
       { height: 1.6, thickness: 0.035, epsilonR: 4.4 },
-      { solveOptions: COARSE_SOLVE_OPTIONS },
+      { solveOptions: COARSE_SOLVE_OPTIONS, tolerance: 0.05 },
     );
     expect(result.converged).toBe(true);
     expect(Math.abs(result.z0 - 75)).toBeLessThan(0.05);
+  });
+
+  it('relative tolerance: tolerancePct=0.01 stops within 1 % of the target', () => {
+    const result = findOptimalWidth(
+      50,
+      { height: 1.6, thickness: 0.035, epsilonR: 4.4 },
+      { solveOptions: COARSE_SOLVE_OPTIONS, tolerancePct: 0.01 },
+    );
+    expect(result.converged).toBe(true);
+    // ±1 % of 50 Ω = ±0.5 Ω
+    expect(Math.abs(result.z0 - 50)).toBeLessThan(0.5);
+  });
+
+  it('absolute tolerance still wins when both are set', () => {
+    // tolerance=0.01 Ω is tighter than tolerancePct=0.10 (5 Ω). The absolute
+    // value should drive the stop criterion.
+    const result = findOptimalWidth(
+      50,
+      { height: 1.6, thickness: 0.035, epsilonR: 4.4 },
+      { solveOptions: COARSE_SOLVE_OPTIONS, tolerance: 0.01, tolerancePct: 0.1 },
+    );
+    expect(result.converged).toBe(true);
+    expect(Math.abs(result.z0 - 50)).toBeLessThan(0.01);
   });
 
   it('rejects an explicit bracket that fails to contain the root', () => {
@@ -102,5 +129,49 @@ describe('Phase 5 — findOptimalWidth via FEM bisection', () => {
         { bracket: { low: 0.05, high: 0.1 } },
       ),
     ).toThrow(/bracket/);
+  });
+
+  it('Round 7: f-aware bisection — FR-4 50 Ω at 10 GHz lands narrower than the static result', () => {
+    // Static target: W ≈ 3 mm gives Z₀_qs ≈ 50 Ω on FR-4.
+    // At 10 GHz the KJ correction drops Z₀(10) to ~48 Ω at the same W,
+    // so to hit Z₀(10) = 50 we need W < 3 mm. Verify the f-aware bisection
+    // returns a width matching that physical expectation.
+    const fixed = { height: 1.6, thickness: 0.035, epsilonR: 4.4 };
+
+    const staticResult = findOptimalWidth(50, fixed, {
+      solveOptions: COARSE_SOLVE_OPTIONS,
+      tolerance: 0.05,
+    });
+
+    const fAwareResult = findOptimalWidth(50, fixed, {
+      solveOptions: COARSE_SOLVE_OPTIONS,
+      tolerance: 0.05,
+      frequencyGHz: 10,
+    });
+
+    console.log(
+      `  Static W = ${staticResult.width.toFixed(4)} mm, ` +
+        `f-aware (10 GHz) W = ${fAwareResult.width.toFixed(4)} mm`,
+    );
+
+    expect(fAwareResult.converged).toBe(true);
+    // f-aware W should sit strictly below the static-target W (because at
+    // 10 GHz Z₀(f) < Z₀_qs, so to push Z₀(f) up to 50 we must narrow W).
+    expect(fAwareResult.width).toBeLessThan(staticResult.width);
+    // And the displayed (KJ-corrected) Z₀ at the recovered W should hit
+    // the 50 Ω target within tolerance.
+    const probe = solveMicrostrip(
+      { ...fixed, width: fAwareResult.width },
+      COARSE_SOLVE_OPTIONS,
+    );
+    const { z0Ratio } = dispersionCorrection({
+      epsilonR: fixed.epsilonR,
+      epsilonEffStatic: probe.epsilonEff,
+      widthMm: fAwareResult.width,
+      heightMm: fixed.height,
+      frequencyGHz: 10,
+    });
+    const z0F = probe.z0 * z0Ratio;
+    expect(Math.abs(z0F - 50)).toBeLessThan(0.1);
   });
 });

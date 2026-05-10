@@ -35,3 +35,6 @@ coverage
 # Plan files (Claude Code working artifacts)
 .claude/
 
+
+# Round 8 setup: extracted potx (raw zip dump, not needed for build)
+vendor/potx-extract/

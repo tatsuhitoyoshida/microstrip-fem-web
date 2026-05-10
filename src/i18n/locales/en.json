@@ -1,7 +1,26 @@
 {
   "app": {
-    "title": "Microstrip FEM",
-    "brand": "Photonic Edge"
+    "title": "Photonics & Electromagnetics Toolkit",
+    "toolNameMain": "Microstrip Line Calculator",
+    "toolNameSuffix": "Based on 2D FEM",
+    "brand": "Photonic Edge",
+    "footer": "Copyright Photonic Edge Inc. All rights reserved.",
+    "mode": {
+      "label": "View mode",
+      "simple": "Simple",
+      "advanced": "Advanced"
+    }
+  },
+  "whatIs": {
+    "title": "What is this and How to use",
+    "intro": "A browser-based calculator for the characteristic impedance Z₀ of a microstrip line — or for the trace width that hits a target impedance.",
+    "accuracy": "Online calculators that rely on closed-form approximations carry subtle errors. This tool runs a 2D finite-element method for higher accuracy.",
+    "usage": "Enter the substrate parameters first. Supply a trace width and Z₀ is computed automatically; supply a target Z₀ and the width is bisection-searched automatically.",
+    "local": "Because the solver runs locally, expect noticeable CPU and memory use during a run. More details <detail>here</detail>."
+  },
+  "geometry": {
+    "ariaLabel": "Reference cross-section of a microstrip line",
+    "ground": "GND"
   },
   "form": {
     "title": "Parameters",
@@ -10,10 +29,22 @@
     "height": "Substrate height h [{{unit}}]",
     "thickness": "Conductor thickness t [{{unit}}]",
     "epsilonR": "Relative permittivity εr",
+    "frequency": "Frequency [GHz]",
     "targetZ0": "Target Z₀ [Ω]",
+    "tolerancePct": "Tolerance ± [%]",
+    "layerStackLegend": "Substrate parameters",
+    "forwardLegend": "Compute Z₀ from trace width",
+    "inverseLegend": "Find trace width from target Z₀",
     "calculate": "Calculate",
-    "findW": "Find W for target Z₀",
-    "findWTooltip": "Bisection on Z₀(W) using FEM"
+    "findW": "Search",
+    "findWTooltip": "Bisection on Z₀(W) using FEM",
+    "adaptiveLegend": "Adaptive mesh",
+    "adaptiveEnable": "Refine where the field changes fastest",
+    "adaptiveTolerance": "Convergence threshold ΔZ₀ [Ω]",
+    "adaptiveHint": "Solves on a coarse mesh, then iteratively refines the highest-error triangles. Turn off for a single fixed-mesh solve.",
+    "adaptiveAdvanced": "Advanced",
+    "adaptiveMaxPasses": "Max passes",
+    "adaptiveAdvancedHint": "The loop iterates until the mesh ceiling (~300k triangles) is hit."
   },
   "results": {
     "title": "Results",
@@ -21,35 +52,65 @@
     "progress": {
       "init": "Loading mesh engine…",
       "meshing-and-solving": "Meshing and solving FEM…",
-      "searching": "Searching for optimal W…"
+      "searching": "Searching for optimal W…",
+      "adaptive-pass": "Refining mesh…",
+      "adaptive-pass-detail": "Pass {{pass}}: {{triangles}} triangles, Z₀ = {{z0}} Ω"
     },
     "empty": "Set parameters and press Calculate.",
     "errorPrefix": "Error: {{message}}",
-    "z0": "Z₀",
-    "epsilonEff": "ε_eff",
+    "z0": "Characteristic impedance Z₀",
+    "heroW": "Optimal trace width W",
+    "epsilonEff": "Effective permittivity ε_eff",
+    "z0Static": "Static Z₀ (FEM, f→0)",
+    "epsilonEffStatic": "Static ε_eff (FEM, f→0)",
+    "dispersionDelta": "Dispersion ΔZ₀",
     "solvedAt": "Solved at W",
     "optimalW": "Optimal W (bisection)",
+    "targetBandLabel": "Target band",
+    "targetBandValue": "{{low}} – {{high}} Ω ({{target}} ± {{pct}} %)",
     "capacitance": "C",
     "vacuumCapacitance": "C₀ (vacuum)",
-    "diagnostics": "Mesh: {{triangles}} triangles · CG iterations: {{withDielectric}} (dielectric) / {{vacuum}} (vacuum)"
+    "diagnostics": "Mesh: {{triangles}} triangles · CG iterations: {{withDielectric}} (dielectric) / {{vacuum}} (vacuum)",
+    "adaptive": {
+      "title": "Adaptive convergence history ({{passes}} passes)",
+      "pass": "Pass",
+      "triangles": "Triangles",
+      "z0": "Z₀ [Ω]",
+      "deltaZ0": "Δ Z₀ [Ω]",
+      "view": "View",
+      "viewing": "Viewing",
+      "viewTooltip": "Show this pass's mesh + |E| in the heatmap",
+      "reset": "Back to final result",
+      "stopReason": {
+        "converged": "✓ Converged (ΔZ₀ below threshold)",
+        "maxPasses": "● Max-passes reached — bump it under Advanced if you need more.",
+        "triangleCeiling": "● Stopped at the mesh ceiling (~300k tri) — Triangle's internal limit.",
+        "noRefinementCandidates": "● No refinement candidates left (every η² is zero)"
+      }
+    }
   },
   "comparison": {
-    "title": "Comparison",
-    "empty": "No results yet.",
-    "method": "Method",
-    "z0": "Z₀ [Ω]",
-    "epsilonEff": "ε_eff",
-    "delta": "Δ Z₀ vs FEM",
     "fem": "FEM",
     "hammerstad": "Hammerstad–Jensen",
     "wheeler": "Wheeler / Pozar"
   },
+  "sweep": {
+    "title": "Z₀ frequency response",
+    "startGHz": "Start [GHz]",
+    "stopGHz": "Stop [GHz]",
+    "xAxis": "Frequency [GHz]",
+    "yAxis": "Z₀ [Ω]",
+    "empty": "The chart appears after a calculation.",
+    "note": "All curves include the Kirschning–Jansen dispersion correction."
+  },
   "plot": {
+    "panelTitle": "Field distribution",
     "title": "Cross-section · |E| heatmap",
     "xAxis": "x [mm]",
     "yAxis": "y [mm]",
-    "colorbar": "|E| [V/length]",
+    "colorbar": "|E| [dB·V/m]",
     "empty": "No mesh yet.",
+    "working": "Working…",
     "conductor": "Conductor",
     "ground": "Ground plane",
     "interface": "Substrate–air interface",

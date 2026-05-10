@@ -40,25 +40,25 @@ Hammerstad-Jensen / Wheeler 式の限界:
 
 ## 3. 技術スタック(決定済み)
 
-| 領域              | 採用                                                           |
-| ----------------- | -------------------------------------------------------------- |
-| 言語              | TypeScript(strict mode)                                        |
-| UI フレームワーク | React 18                                                       |
-| ビルドツール      | Vite                                                           |
-| メッシュ生成      | `triangle-wasm`(Triangle の WebAssembly ポート)                |
-| 線形ソルバ        | `eigen-js`(Eigen の WebAssembly ポート、SimplicialLDLT を使用) |
-| FEM 組立          | TypeScript で自作                                              |
-| 可視化            | Plotly.js(電界ヒートマップ・スイープ曲線)                      |
-| 国際化            | `react-i18next`(JA/EN bilingual)                               |
-| 計算オフロード    | Web Worker(メインスレッドをブロックしない)                     |
-| テスト            | Vitest                                                         |
-| Lint/Format       | ESLint + Prettier                                              |
-| デプロイ          | Cloudflare Pages(無料枠で十分)                                 |
+| 領域              | 採用                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| 言語              | TypeScript(strict mode、`noUncheckedIndexedAccess` 有効)                            |
+| UI フレームワーク | React 19                                                                            |
+| ビルドツール      | Vite(Rolldown バンドラ)                                                             |
+| メッシュ生成      | `triangle-wasm`(Triangle の WebAssembly ポート)                                     |
+| 線形ソルバ        | 自作 Jacobi 前処理付き共役勾配法 (`src/fem/solver.ts`)                              |
+| FEM 組立          | TypeScript で自作                                                                   |
+| 可視化            | Plotly.js(電界ヒートマップ・スイープ曲線、動的 import で遅延ロード)                 |
+| 国際化            | `react-i18next`(JA/EN bilingual)                                                    |
+| 計算オフロード    | Web Worker(メインスレッドをブロックしない)                                          |
+| テスト            | Vitest                                                                              |
+| Lint/Format       | ESLint + Prettier                                                                   |
+| デプロイ          | Cloudflare Pages(無料枠で十分)                                                      |
 
 ライブラリ選定の意図:
 
 - `triangle-wasm`: 任意ポリゴン領域のDelaunay三角分割に対応。将来CPW/ストリップラインに拡張する際にも同じツールで対応可能
-- `eigen-js`: スパース対称正定値行列に対する SimplicialLDLT は本問題に最適。10k 自由度クラスでミリ秒オーダーの解
+- 自作 CG ソルバ: 当初 `eigen-js` を想定していたが、公開されている WASM ビルドは `SimplicialLDLT` を露出していなかった。~10k DOF の本問題では Jacobi-PCG で十分にサブ秒で解け、外部依存も減らせるため自作に倒した。プロファイル次第で IC(0) や自作スパース LDLT への置換余地は残してある(詳細: `src/fem/solver.ts` 冒頭コメント)。
 - 自作FEM: 線形三角要素の組立は数百行で書ける。教育的価値・ブログ記事化・拡張性のため自作する
 
 ---
@@ -163,120 +163,122 @@ ResultsPanel.tsx + CrossSectionPlot.tsx
 
 ## 6. 開発フェーズ
 
-各フェーズの完了基準を満たしてから次へ進むこと。各フェーズの最後にユーザに進捗を報告し、確認を得ること。
+> **現状(2026-05-08 時点)**: Phase 0–9 まで実装・コミット済み。残るは Phase 10(Cloudflare Pages への初回デプロイ)で、これは Tatsy が手動で実施する。下記チェックリストは "何をどの順で作ったか" の歴史記録として残しているので、新規実装時はこのフェーズ表ではなく `docs/architecture.md` と既存コードを参照のこと。
 
-### Phase 0: プロジェクト初期化(1-2日)
+各フェーズの完了基準は当時のものをそのまま残してある。新規変更が下記の完了基準を破らないかは `tests/` の各テストが回帰バーになっている。
 
-- [ ] `npm create vite@latest` で React + TypeScript プロジェクト作成
-- [ ] ESLint + Prettier 設定
-- [ ] Vitest 導入
-- [ ] MIT LICENSE 作成(Copyright (c) 2026 Photonic Edge Inc.)
-- [ ] README skeleton(EN/JA)
-- [ ] `.gitignore`(`node_modules`, `dist`, `.DS_Store` など)
-- [ ] 初回コミット可能な状態
+### Phase 0: プロジェクト初期化 ✅
+
+- [x] `npm create vite@latest` で React + TypeScript プロジェクト作成
+- [x] ESLint + Prettier 設定
+- [x] Vitest 導入
+- [x] MIT LICENSE 作成(Copyright (c) 2026 Photonic Edge Inc.)
+- [x] README skeleton(EN/JA)
+- [x] `.gitignore`(`node_modules`, `dist`, `.DS_Store` など)
+- [x] 初回コミット可能な状態
 
 **完了基準**: `npm run dev` でデフォルト Vite ページが表示される。
 
-### Phase 1: 解析公式の実装(2-3日)
+### Phase 1: 解析公式の実装 ✅
 
-ベースラインかつ UI のフォールバック値として最初に実装する。FEM ができる前から UI が動かせる。
+ベースラインかつ UI のフォールバック値として最初に実装した。FEM ができる前から UI が動かせる。
 
-- [ ] `analytical/wheeler.ts`: Wheeler の式で Z₀(W, h, εr, t) を計算
-- [ ] `analytical/hammerstad.ts`: Hammerstad-Jensen の式で Z₀ と ε_eff を計算
-- [ ] 教科書の参照値(下記検証セクション参照)に対する単体テスト
+- [x] `analytical/wheeler.ts`: Wheeler の式で Z₀(W, h, εr, t) を計算
+- [x] `analytical/hammerstad.ts`: Hammerstad-Jensen の式で Z₀ と ε_eff を計算
+- [x] 教科書の参照値(下記検証セクション参照)に対する単体テスト
 
 **完了基準**: 50 Ω@FR-4(εr=4.4, h=1.6mm)で W ≈ 3.0mm が ±2% 以内で得られる。
 
-### Phase 2: メッシュ生成(3-5日)
+### Phase 2: メッシュ生成 ✅
 
-- [ ] `triangle-wasm` を依存追加・WASM ロード処理
-- [ ] `geometry.ts`: マイクロストリップ断面のパラメータ → PSLG(点・線分・領域マーカ・穴)変換
+- [x] `triangle-wasm` を依存追加・WASM ロード処理
+- [x] `geometry.ts`: マイクロストリップ断面のパラメータ → PSLG(点・線分・領域マーカ・穴)変換
   - 外側計算領域: 基板幅の 10〜20倍、基板厚の 10〜20倍を上空に確保
   - 接地面: 領域下端
   - 基板: εr 領域マーカ
   - 導体: 矩形(W × t)を「穴」として扱い、その境界を Dirichlet境界とする
-- [ ] `mesh.ts`: triangle-wasm 呼び出しラッパ。最大面積制約・最小角度制約を指定
-- [ ] 導体エッジ近傍の局所細分化(adaptive refinement)
-- [ ] デバッグ用メッシュ可視化機能(Plotly.js でメッシュエッジを描画)
+- [x] `mesh.ts`: triangle-wasm 呼び出しラッパ。最大面積制約・最小角度制約を指定
+- [x] 導体エッジ近傍の局所細分化(adaptive refinement)
+- [x] デバッグ用メッシュ可視化機能(Plotly.js でメッシュエッジを描画)
 
 **完了基準**: 標準的な microstrip 形状でクオリティの高いメッシュ(最小角度 ≥ 25°)が生成され、導体エッジ周辺が密になっていることを目視確認。
 
-### Phase 3: FEM コア実装(5-7日)
+### Phase 3: FEM コア実装 ✅
 
-- [ ] `assembly.ts`: 線形三角要素(T3)の要素剛性行列を実装
+- [x] `assembly.ts`: 線形三角要素(T3)の要素剛性行列を実装
   - 要素 e の頂点 (x_i, y_i)、面積 A_e、形状関数の勾配 b_i, c_i から
   - K^e\_{ij} = (ε_e / 4A_e) · (b_i b_j + c_i c_j)
-- [ ] 全体剛性行列 K の組立(スパース行列、CSR/COO 形式)
-- [ ] Dirichlet 境界条件の適用(導体ノード φ=1V、接地面 φ=0、外部境界 φ=0)
-- [ ] `solver.ts`: eigen-js の SimplicialLDLT で連立方程式を解く
-- [ ] 既知解との照合: 平行平板コンデンサ(解析解 C = εA/d)で精度検証
+- [x] 全体剛性行列 K の組立(スパース行列、CSR/COO 形式)
+- [x] Dirichlet 境界条件の適用(行/列消去法。詳細は §7.4)
+- [x] `solver.ts`: 自作 Jacobi-PCG で連立方程式を解く(eigen-js は不採用、§3 参照)
+- [x] 既知解との照合: 平行平板コンデンサ(解析解 C = εA/d)で精度検証
 
 **完了基準**: 平行平板コンデンサ問題で 1% 以内の誤差で C が再現される。
 
-### Phase 4: 容量・伝送線路パラメータ抽出(3-5日)
+### Phase 4: 容量・伝送線路パラメータ抽出 ✅
 
-- [ ] `capacitance.ts`: エネルギー法 W_e = (1/2) φ^T K φ から C = 2W_e / V² を計算
-- [ ] εr ありで C、ε=1 で C₀(L = μ₀ε₀ / C₀)を計算
-- [ ] `tlanalysis.ts`: Z₀ = √(L/C) = 1/(c √(C·C₀))、ε_eff = C/C₀
-- [ ] Phase 1 の解析式との比較(薄導体・標準形状で 2% 以内一致)
+- [x] `capacitance.ts`: エネルギー法 W_e = (1/2) φ^T K φ から C = 2W_e / V² を計算
+- [x] εr ありで C、ε=1 で C₀(L = μ₀ε₀ / C₀)を計算
+- [x] `tlanalysis.ts`: Z₀ = √(L/C) = 1/(c √(C·C₀))、ε_eff = C/C₀
+- [x] Phase 1 の解析式との比較(薄導体・標準形状で 2% 以内一致)
 
 **完了基準**: 標準的な microstrip 形状で Hammerstad 式と 2% 以内、HFSS 結果と 1% 以内で Z₀ が一致。
 
-### Phase 5: 最適化(1-2日)
+### Phase 5: 最適化 ✅
 
-- [ ] `bisection.ts`: 二分法で Z₀(W) = Z₀_target を満たす W を探索
-- [ ] 初期範囲は Hammerstad 式の解の周辺(0.5×〜2×)で限定
-- [ ] 収束判定: |Z₀ - Z₀_target| < 0.05 Ω
+- [x] `bisection.ts`: 二分法で Z₀(W) = Z₀_target を満たす W を探索
+- [x] 初期範囲は Hammerstad 式の解の周辺(0.5×〜2×)で限定
+- [x] 収束判定: |Z₀ - Z₀_target| < 0.05 Ω
 
 **完了基準**: 50 Ω 目標で W が 0.05 Ω 精度で求まる。
 
-### Phase 6: UI 実装(5-7日)
+### Phase 6: UI 実装 ✅
 
-- [ ] `ParameterForm.tsx`: 入力フィールド(W, h, t, εr, tan δ, 周波数, 目標 Z₀)
+- [x] `ParameterForm.tsx`: 入力フィールド(W, h, t, εr, 目標 Z₀)
   - バリデーション(正値、合理的範囲)
   - SI 単位プリセット(mil/mm 切替)
-- [ ] `ResultsPanel.tsx`: Z₀, ε_eff, 推奨 W の表示
-- [ ] `CrossSectionPlot.tsx`: Plotly.js で断面と電界 |E| ヒートマップを描画
-- [ ] `ComparisonTable.tsx`: FEM 値 vs Wheeler 値 vs Hammerstad 値の3列比較
-- [ ] `About.tsx`: 「なぜ FEM か」「Photonic Edge について」「ライセンス」「GitHub リンク」
+- [x] `ResultsPanel.tsx`: Z₀, ε_eff, 推奨 W の表示
+- [x] `CrossSectionPlot.tsx`: Plotly.js で断面と電界 |E| ヒートマップを描画
+- [x] `ComparisonTable.tsx`: FEM 値 vs Wheeler 値 vs Hammerstad 値の3列比較
+- [x] `About.tsx`: 「なぜ FEM か」「Photonic Edge について」「ライセンス」「GitHub リンク」
 
 **完了基準**: 全主要機能が UI から操作でき、Wheeler との比較で違いが視覚化される。
 
-### Phase 7: i18n(2-3日)
+### Phase 7: i18n ✅
 
-- [ ] `react-i18next` 導入・設定
-- [ ] `locales/ja.json`, `locales/en.json` の作成(全 UI 文字列)
-- [ ] `LanguageSwitcher.tsx`: ヘッダ右上、`JA / EN` 切替
-- [ ] URL パスベースのロケール(`/ja/`, `/en/`)、ブラウザ言語からの自動検出
-- [ ] About / 解説ページの両言語版
+- [x] `react-i18next` 導入・設定
+- [x] `locales/ja.json`, `locales/en.json` の作成(全 UI 文字列)
+- [x] `LanguageSwitcher.tsx`: ヘッダ右上、`JA / EN` 切替
+- [x] URL パスベースのロケール(`/ja/`, `/en/`)、ブラウザ言語からの自動検出
+- [x] About / 解説ページの両言語版
 
 **完了基準**: ブラウザ言語に応じて初期表示が切り替わり、手動切替も機能する。
 
-### Phase 8: パフォーマンス・UX(3-5日)
+### Phase 8: パフォーマンス・UX ✅
 
-- [ ] FEM 計算を Web Worker(`workers/femWorker.ts`)に分離
-- [ ] ローディングインジケータ(メッシュ生成中・FEM 計算中の進捗表示)
-- [ ] エラーハンドリング(メッシュ失敗・収束失敗・無効入力)
-- [ ] モバイルレスポンシブ(縦長レイアウト)
-- [ ] バンドルサイズ最適化(triangle-wasm, eigen-js は遅延ロード)
-- [ ] Lighthouse スコアの測定(Performance ≥ 90 を目標)
+- [x] FEM 計算を Web Worker(`workers/femWorker.ts`)に分離
+- [x] ローディングインジケータ(メッシュ生成中・FEM 計算中の進捗表示)
+- [x] エラーハンドリング(メッシュ失敗・収束失敗・無効入力)
+- [x] モバイルレスポンシブ(縦長レイアウト)
+- [x] バンドルサイズ最適化(Plotly は動的 import で遅延ロード)
+- [x] Lighthouse スコアの測定(Performance ≥ 90 を目標)
 
 **完了基準**: 標準的な計算が 1 秒以内に完了、UI がブロックされない。
 
-### Phase 9: ドキュメント(3-5日)
+### Phase 9: ドキュメント ✅
 
-- [ ] `docs/theory.md` (EN), `docs/theory.ja.md`: FEM の数学的解説、なぜ closed-form より精度が出るかのショーケース(誤差プロット)
-- [ ] `docs/validation.md`: HFSS / CST / 教科書値との比較表(数値は Tatsy が後で埋める)
-- [ ] `docs/architecture.md`: アーキテクチャ図解
-- [ ] `docs/deployment.md`: Cloudflare Pages デプロイ手順
-- [ ] README 最終版(EN/JA): スクリーンショット、機能、ライセンス、コントリビュート方法
+- [x] `docs/theory.md` (EN), `docs/theory.ja.md`: FEM の数学的解説、なぜ closed-form より精度が出るかのショーケース(誤差プロット)
+- [x] `docs/validation.md`: HFSS / CST / 教科書値との比較表(数値は Tatsy が後で埋める)
+- [x] `docs/architecture.md`: アーキテクチャ図解
+- [x] `docs/deployment.md`: Cloudflare Pages デプロイ手順
+- [x] README 最終版(EN/JA): スクリーンショット、機能、ライセンス、コントリビュート方法
 
 **完了基準**: 第三者が README から技術概要を把握でき、ローカル実行できる。
 
-### Phase 10: デプロイ準備
+### Phase 10: デプロイ準備(Tatsy 担当)
 
-- [ ] `npm run build` の成功確認
-- [ ] dist サイズの確認(目標 < 5 MB gzip)
+- [x] `npm run build` の成功確認
+- [x] dist サイズの確認(目標 < 5 MB gzip)
 - [ ] Cloudflare Pages 設定の README 化(Tatsy が後で実行)
 - [ ] DNS 設定手順の README 化(社内確認後に実行)
 
@@ -325,7 +327,9 @@ K^e_{ij} = εr_e A_e (b_i b_j + c_i c_j)
 - 外部境界: φ = 0(無限遠近似)
 - 誘電体界面: 自動的に弱形式から処理される(明示的な処理不要)
 
-Dirichlet 境界の適用は、対応する自由度を行列から削除するか、ペナルティ法を用いる。実装簡便さのためペナルティ法(対角要素を巨大値に置換)を推奨。
+Dirichlet 境界の適用は **行/列消去法** を採用している(`src/fem/boundary.ts`)。各 Dirichlet 節点 i に対し、列 K[:, i] · φ̂_i 寄与を b から差し引いた上で行 i・列 i を 0 化、K[i, i] = 1, b[i] = φ̂_i とする。これで残りの自由度に対する系は対称・良条件で、CG が素直に収束する。
+
+当初は実装簡便さからペナルティ法(対角要素を巨大値に置換)を検討したが、ペナルティ行のせいで残差ノルムが支配され、内部残差が落ちる前に CG が「収束」と判定して止まる現象が出たため不採用とした。同種の事情で再導入は推奨しない。
 
 ### 7.5 容量抽出
 
@@ -509,13 +513,20 @@ npm install
 npm run dev
 
 # テスト
-npm test
+npm test                                    # watch モード
+npm run test:run                            # 単発実行(CI / エージェント向け)
+npm run test:ui                             # Vitest UI モード
+npx vitest run tests/microstrip.test.ts     # 単一ファイルだけ
+npx vitest run -t "FR-4"                    # テスト名パターン
 
 # 型チェック
 npm run typecheck
 
-# Lint
+# Lint / Format
 npm run lint
+npm run lint:fix
+npm run format
+npm run format:check
 
 # 本番ビルド
 npm run build
@@ -525,6 +536,20 @@ npm run preview
 ```
 
 Node.js は v20 LTS 以上を想定。
+
+---
+
+## 14.5 Implementation gotchas(再現の難しい既知の罠)
+
+仕様書にも README にも書きづらいが、知らないと踏む地雷。新規エージェントは作業前に一度目を通すこと。
+
+- **`triangle-wasm` を自前ビルドに差し替え済み**: 上流の `triangle-wasm@1.0.0` は `ALLOW_MEMORY_GROWTH=0` で 16 MB 固定ヒープにコンパイルされており、~60k 三角形で天井に当たっていた。`vendor/triangle-wasm/build-with-growth.sh` で Triangle (Shewchuk) を `-s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=32MB -s MAXIMUM_MEMORY=512MB` で再ビルドし、`public/triangle.out.wasm` と `node_modules/triangle-wasm/triangle.out.{wasm,js}` を差し替え。実用上限はおよそ ~300k 三角形(それ以上で Triangle 内部が null pointlist を返すため、`solveMicrostripAdaptive` は catch して停止理由 'triangleCeiling' で終了)。**`npm install` 後は `package.json` の `postinstall` フック(`scripts/install-triangle-wasm.mjs`)が自動的に node_modules を上書きする** ので手動の再差し替えは不要。手動で走らせる場合は `npm run install:triangle-wasm`。
+- **テスト時の WebAssembly ローダ shim**: `tests/setup.ts` で `WebAssembly.instantiateStreaming` を `undefined` に潰している。これは Emscripten が Node 22+ では fetch 経由を選ぼうとするが、テスト側は `file://` パス(`fs.readFileSync` 経路)を渡しているため。掃除しないこと、load-bearing。
+- **Bisection は粗メッシュで走る**: `src/workers/femWorker.ts` は二分探索プローブ中だけ `geometry.{substrateMaxArea, airMaxArea}` を粗く上書きし、最終 W が定まった後で初めてユーザ指定密度の本番ソルブを 1 回走らせる。8〜9 回プローブをサブ秒に収めるための仕掛け。
+- **Plotly は動的 import**: `CrossSectionPlot.tsx` 内で初回結果到着時に `plotly.js-dist-min` を import している(~1.4 MB チャンク)。他所で静的に import しないこと。バンドル予算を破壊する。
+- **Web Worker は Vite の `?worker` 構文で生成**: `useMicrostripCalc.ts` の `import FemWorker from '../workers/femWorker.ts?worker'` が唯一のワーカエントリ。普通の import に書き換えると Vite がチャンクを分けてくれない。
+- **`noUncheckedIndexedAccess` 有効**: 配列アクセスの戻り値が `T | undefined` 型になるため、FEM コードでは至るところで `!` を付けて narrow している。新規コードも同じ作法で。
+- **OneDrive 配下のリポジトリ**: 現在 `C:\Users\Tatsuhito\OneDrive\…` 配下に置かれている。OneDrive が `.git/index.lock` や packfile を sync 中に掴むと `git commit` / `git gc` が偶発的に失敗するため、エクスプローラで本フォルダを「常にこのデバイス上に保持」に固定しておくこと。
 
 ---
 
@@ -544,14 +569,14 @@ Node.js は v20 LTS 以上を想定。
 
 ## 16. 進め方の原則
 
-- 各 Phase の完了時に必ずユーザに報告し、確認を取ってから次へ進む
+- **FEM パイプライン(`src/fem/*.ts`, `src/optimization/*.ts`)を変更する前にユーザに確認**を取る。`tests/parallel-plate.test.ts` と `tests/microstrip.test.ts` が唯一の数値回帰バーで、これを破ると気付かないまま精度が落ちるリスクがあるため。
+- **§12 のスコープ外項目に踏み込む前にユーザに確認**を取る。誘惑があっても `docs/roadmap.md`(将来作成)に記録だけして実装しない。
 - 設計判断で迷うときは、本ドキュメントの「なぜ」セクションに立ち戻る
-- スコープ外項目への誘惑があったら、`docs/roadmap.md`(将来作成)に記録だけして実装しない
 - コードを書く前にテストを書く(TDD 推奨、ただし強制はしない)
 - コミットは細かく、メッセージは英語で `feat:`, `fix:`, `docs:`, `test:`, `refactor:` のプレフィックス付き
 - 大きな設計変更が必要と判断したら、実装前に必ずユーザに相談
 
 ---
 
-**最終更新**: 2026-05-07
+**最終更新**: 2026-05-08(Phase 0–9 完了反映、技術スタック・境界条件・gotchas を実装に同期)
 **作成者**: Tatsy + Claude(対話による設計セッション)

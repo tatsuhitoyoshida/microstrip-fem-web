@@ -71,11 +71,15 @@ describe('mesh generation — triangle-wasm integration', () => {
     const { pslg } = buildMicrostripPslg(FR4);
     const mesh = meshFromPslg(pslg);
     const nVerts = mesh.vertices.length / 2;
+    let minIdx = Infinity;
+    let maxIdx = -Infinity;
     for (let i = 0; i < mesh.triangles.length; i++) {
       const v = mesh.triangles[i]!;
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThan(nVerts);
+      if (v < minIdx) minIdx = v;
+      if (v > maxIdx) maxIdx = v;
     }
+    expect(minIdx).toBeGreaterThanOrEqual(0);
+    expect(maxIdx).toBeLessThan(nVerts);
   });
 
   it('mesh bounds match the geometry domain (no triangles inside the conductor)', () => {

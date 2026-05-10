@@ -11,8 +11,9 @@
  * dummy heatmap trace carries the colorbar.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 // Type-only import — the runtime module is loaded lazily inside the effect
 // below so Plotly stays out of the initial bundle (CLAUDE.md §6 Phase 8).
 import type * as Plotly from 'plotly.js';
@@ -55,32 +56,49 @@ const VIRIDIS_24 = [
   '#fde725',
 ];
 
-const METAL_COLOR = '#dd2222';
-const METAL_BORDER = '#8a1111';
-const INTERFACE_COLOR = 'rgba(245, 245, 245, 0.85)';
+const METAL_COLOR = '#ed7d31';
+const METAL_BORDER = '#a64b0b';
+const INTERFACE_COLOR = 'rgba(231, 230, 230, 0.65)';
+// Dark theme tokens — kept in sync with `--color-bg-panel`, `--color-text`,
+// and `--color-text-muted` in `src/index.css`.
+const PLOT_BG = '#162639';
+const PLOT_PAPER_BG = '#162639';
+const PLOT_TEXT = '#e7e6e6';
+const PLOT_GRID = '#2c3e5a';
 
 export interface CrossSectionPlotProps {
   result: CalcResult | null;
+  /** Show a small "still working" badge over the heatmap while a solve runs. */
+  isLoading?: boolean;
 }
 
 interface TriangleStats {
-  /** Per-triangle |E| (length = nTri). */
-  e: Float64Array;
+  /** Per-triangle |E| in dB (V/m). length = nTri. */
+  eDb: Float64Array;
   /** Vertex coordinate triples per triangle (one entry of 3 (x, y) pairs). */
   triXs: number[][];
   triYs: number[][];
-  eMin: number;
-  eMax: number;
+  /** Lowest dB value displayed (clipped at DB_FLOOR_BELOW_MAX below the max). */
+  eDbMin: number;
+  /** Highest dB value, capped at the 99th percentile so the corner-edge
+   *  singularity doesn't compress the rest of the field. */
+  eDbMax: number;
 }
+
+/**
+ * Drive voltage is V_drive = 1 V; vertex coordinates are in mm. So |∇φ| comes
+ * out in V/mm; multiply by 1000 to get V/m before taking dB.
+ */
+const MM_TO_M = 1000;
+/** Plot dynamic range below the (saturated) peak. */
+const DB_FLOOR_BELOW_MAX = 60;
 
 function computeTriangleStats(result: CalcResult): TriangleStats {
   const { mesh, phi } = result.fem;
   const nTri = mesh.triangleCount;
-  const e = new Float64Array(nTri);
+  const eMag = new Float64Array(nTri);
   const triXs: number[][] = new Array(nTri);
   const triYs: number[][] = new Array(nTri);
-  let eMin = Infinity;
-  let eMax = -Infinity;
 
   for (let t = 0; t < nTri; t++) {
     const i0 = mesh.triangles[3 * t]!;
@@ -102,14 +120,30 @@ function computeTriangleStats(result: CalcResult): TriangleStats {
     const c2 = (x1 - x0) * inv2A;
     const dx = b0 * phi[i0]! + b1 * phi[i1]! + b2 * phi[i2]!;
     const dy = c0 * phi[i0]! + c1 * phi[i1]! + c2 * phi[i2]!;
-    const mag = Math.sqrt(dx * dx + dy * dy);
-    e[t] = mag;
-    if (mag < eMin) eMin = mag;
-    if (mag > eMax) eMax = mag;
+    // |∇φ| in V/mm — convert to V/m for the absolute-dB scale.
+    eMag[t] = Math.sqrt(dx * dx + dy * dy) * MM_TO_M;
     triXs[t] = [x0, x1, x2];
     triYs[t] = [y0, y1, y2];
   }
-  return { e, triXs, triYs, eMin, eMax };
+
+  // Cap the colour-bar maximum at the 99th-percentile dB value: the conductor
+  // corner singularity drives the raw max up by ~20–40 dB and would otherwise
+  // squash everyone else into the bottom two bins. Floor 60 dB below that
+  // cap so the dynamic range is always 60 dB regardless of geometry.
+  const sorted = Float64Array.from(eMag).sort();
+  const eMagCap = sorted[Math.floor(sorted.length * 0.99)] ?? sorted[sorted.length - 1] ?? 1;
+  const eDbMax = eMagCap > 0 ? 20 * Math.log10(eMagCap) : 0;
+  const eDbMin = eDbMax - DB_FLOOR_BELOW_MAX;
+
+  const eDb = new Float64Array(nTri);
+  for (let t = 0; t < nTri; t++) {
+    const m = eMag[t]!;
+    // Below 10^(eDbMin / 20) V/m we just clip — anything that quiet won't
+    // help the user understand the field structure.
+    eDb[t] = m > 0 ? Math.max(eDbMin, 20 * Math.log10(m)) : eDbMin;
+  }
+
+  return { eDb, triXs, triYs, eDbMin, eDbMax };
 }
 
 interface PlotLabels {
@@ -120,21 +154,16 @@ interface PlotLabels {
 }
 
 function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabels): Plotly.Data[] {
-  const { triXs, triYs, e, eMin, eMax } = stats;
-  // Saturate the upper end at 99th percentile so the corner singularities
-  // don't wash out the rest of the field. (Phase 8 will let the user
-  // override this.)
-  const sorted = Float64Array.from(e).sort();
-  const eClipMax = sorted[Math.floor(sorted.length * 0.99)] ?? eMax;
-  const range = eClipMax - eMin || 1;
+  const { triXs, triYs, eDb, eDbMin, eDbMax } = stats;
+  const range = eDbMax - eDbMin || 1;
 
   const buckets: { xs: (number | null)[]; ys: (number | null)[] }[] = Array.from(
     { length: N_BINS },
     () => ({ xs: [], ys: [] }),
   );
 
-  for (let t = 0; t < e.length; t++) {
-    const norm = Math.min(1, Math.max(0, (e[t]! - eMin) / range));
+  for (let t = 0; t < eDb.length; t++) {
+    const norm = Math.min(1, Math.max(0, (eDb[t]! - eDbMin) / range));
     const bin = Math.min(N_BINS - 1, Math.floor(norm * N_BINS));
     const tri = buckets[bin]!;
     const xs = triXs[t]!;
@@ -164,14 +193,19 @@ function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabel
   // Dummy heatmap to render a colorbar with the right scale.
   traces.push({
     type: 'heatmap',
-    x: [eMin, eClipMax],
+    x: [eDbMin, eDbMax],
     y: [0, 0],
-    z: [[eMin, eClipMax]],
+    z: [[eDbMin, eDbMax]],
     colorscale: VIRIDIS_24.map((c, i) => [i / (VIRIDIS_24.length - 1), c]),
     showscale: true,
     opacity: 0,
     hoverinfo: 'skip',
-    colorbar: { title: { text: labels.colorbar }, len: 0.8 },
+    colorbar: {
+      title: { text: labels.colorbar, font: { color: '#e7e6e6' } },
+      tickfont: { color: '#e7e6e6' },
+      outlinecolor: '#2c3e5a',
+      len: 0.8,
+    },
   } as Plotly.Data);
 
   // Substrate–air interface (dashed, broken around the conductor footprint).
@@ -221,10 +255,122 @@ function buildTraces(result: CalcResult, stats: TriangleStats, labels: PlotLabel
   return traces;
 }
 
-export function CrossSectionPlot({ result }: CrossSectionPlotProps): React.ReactElement {
+/** Build the layout object — cheap (~ms), so rebuilt on every paint. */
+function buildLayout(result: CalcResult, t: TFunction): Partial<Plotly.Layout> {
+  const { height: h, thickness: tk, epsilonR } = result.paramsUsed;
+  const { xMin, xMax, yMin, yMax } = result.fem.bounds;
+  // Anchor the substrate / air labels to the left edge so they don't
+  // collide with the conductor or its field singularity.
+  const annoX = xMin + 0.04 * (xMax - xMin);
+  const labelStyle = {
+    showarrow: false,
+    font: { color: PLOT_TEXT, size: 12 },
+    bgcolor: 'rgba(15, 27, 45, 0.78)',
+    bordercolor: PLOT_GRID,
+    borderwidth: 1,
+    borderpad: 3,
+    xanchor: 'left' as const,
+  };
+  // Lock the view to the geometry bounds. The combination of
+  // `scaleanchor: 'y' + scaleratio: 1` (1:1 aspect) and explicit ranges
+  // is over-determined when the canvas aspect doesn't match the data
+  // aspect — without `constrain: 'domain'` Plotly resolves it by
+  // **expanding the range** to fill the canvas, which makes the heatmap
+  // shrink visually on every resize (and the effect compounds because
+  // `uirevision` then locks in the expanded range). `constrain: 'domain'`
+  // tells Plotly to instead **shrink the plotting domain** (leaving
+  // whitespace inside the canvas) so the heatmap always renders at its
+  // full data range, as large as possible. `uirevision` is a constant
+  // string so the user's manual pan / zoom is preserved across
+  // re-renders within the same calculation; it changes only when the
+  // cross-section geometry itself does (e.g. new W from Find-W).
+  const uirevision = `${xMin}:${xMax}:${yMin}:${yMax}`;
+  return {
+    paper_bgcolor: PLOT_PAPER_BG,
+    plot_bgcolor: PLOT_BG,
+    font: { color: PLOT_TEXT, family: 'Calibri, Inter, sans-serif' },
+    xaxis: {
+      title: { text: t('plot.xAxis'), font: { color: PLOT_TEXT } },
+      tickfont: { color: PLOT_TEXT },
+      gridcolor: PLOT_GRID,
+      zerolinecolor: PLOT_GRID,
+      linecolor: PLOT_GRID,
+      scaleanchor: 'y',
+      scaleratio: 1,
+      range: [xMin, xMax],
+      autorange: false,
+      constrain: 'domain',
+    },
+    yaxis: {
+      title: { text: t('plot.yAxis'), font: { color: PLOT_TEXT } },
+      tickfont: { color: PLOT_TEXT },
+      gridcolor: PLOT_GRID,
+      zerolinecolor: PLOT_GRID,
+      linecolor: PLOT_GRID,
+      range: [yMin, yMax],
+      autorange: false,
+      constrain: 'domain',
+    },
+    uirevision,
+    margin: { t: 20, r: 20, b: 50, l: 60 },
+    showlegend: false,
+    annotations: [
+      {
+        ...labelStyle,
+        x: annoX,
+        y: h * 0.5,
+        text: t('plot.substrateLabel', { er: epsilonR.toFixed(2) }),
+      },
+      {
+        ...labelStyle,
+        x: annoX,
+        y: h + tk + 0.5 * (yMax - h - tk),
+        text: t('plot.airLabel'),
+      },
+    ],
+  };
+}
+
+export function CrossSectionPlot({
+  result,
+  isLoading,
+}: CrossSectionPlotProps): React.ReactElement {
   const ref = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
+  /**
+   * Tracks which `result` is currently painted on the Plotly node, so the
+   * label-only effect (which reacts to `t` changes) can verify the heavy
+   * effect has already finished and skip otherwise. This is what makes the
+   * language switch fast: when only `t` changes, we update axis titles /
+   * annotations / colorbar via Plotly.relayout + restyle and skip the
+   * polygon redraw entirely.
+   */
+  const renderedResult = useRef<CalcResult | null>(null);
 
+  // Heavy: |E| computation + bucket sort. Recomputed only on result change.
+  const stats = useMemo(() => (result ? computeTriangleStats(result) : null), [result]);
+
+  // Trace shape doesn't depend on language at the visible level — colorbar
+  // text is the only user-facing label and we update it via Plotly.restyle
+  // in the lightweight effect below. So memoising on [result, stats] (no t)
+  // means a language switch reuses the same trace objects.
+  const traces = useMemo(() => {
+    if (!result || !stats) return null;
+    const labels: PlotLabels = {
+      colorbar: t('plot.colorbar'),
+      conductor: t('plot.conductor'),
+      ground: t('plot.ground'),
+      interface: t('plot.interface'),
+    };
+    return buildTraces(result, stats, labels);
+    // `t` deliberately omitted: label changes are pushed via Plotly.relayout
+    // / restyle in the lightweight effect below, not by rebuilding traces.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, stats]);
+
+  // Heavy effect: full Plotly.react when the result (and therefore traces)
+  // changes. Does NOT depend on `t`, so language switches don't trigger
+  // a polygon redraw.
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
@@ -232,61 +378,98 @@ export function CrossSectionPlot({ result }: CrossSectionPlotProps): React.React
     void (async () => {
       const Plotly = (await loadPlotly()).default;
       if (cancelled || !ref.current) return;
-      if (!result) {
+      if (!result || !traces) {
         Plotly.purge(node);
+        renderedResult.current = null;
         return;
       }
-      const stats = computeTriangleStats(result);
-      const labels: PlotLabels = {
-        colorbar: t('plot.colorbar'),
-        conductor: t('plot.conductor'),
-        ground: t('plot.ground'),
-        interface: t('plot.interface'),
-      };
-      const traces = buildTraces(result, stats, labels);
+      const layout = buildLayout(result, t);
+      void Plotly.react(node, traces, layout, { responsive: true, displaylogo: false });
+      renderedResult.current = result;
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `t` deliberately omitted: language changes are handled by the
+    // lightweight relayout/restyle effect below; we don't want them to
+    // trigger a full polygon redraw here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, traces]);
+
+  // Lightweight effect: when only `t` changes (same result already drawn),
+  // push the new labels via Plotly.relayout (axis titles, annotations) and
+  // Plotly.restyle (colorbar title). Skips the polygon rebuild entirely.
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || !result) return;
+    // Bail if the heavy effect hasn't drawn this result yet — it'll paint
+    // the correct labels in the first place.
+    if (renderedResult.current !== result) return;
+    let cancelled = false;
+    void (async () => {
+      const Plotly = (await loadPlotly()).default;
+      if (cancelled || !ref.current) return;
       const { height: h, thickness: tk, epsilonR } = result.paramsUsed;
       const { xMin, xMax, yMax } = result.fem.bounds;
-      // Anchor the substrate / air labels to the left edge so they don't
-      // collide with the conductor or its field singularity.
       const annoX = xMin + 0.04 * (xMax - xMin);
+      const subY = h * 0.5;
+      const airY = h + tk + 0.5 * (yMax - h - tk);
+      // Plotly accepts dot-path keys at runtime ("title.text" etc.) but the
+      // public TS types only know about the nested form, so we cast the
+      // update payload through `unknown`.
       const labelStyle = {
         showarrow: false,
-        font: { color: '#1f2933', size: 11 },
-        bgcolor: 'rgba(255,255,255,0.78)',
-        borderpad: 2,
+        font: { color: PLOT_TEXT, size: 12 },
+        bgcolor: 'rgba(15, 27, 45, 0.78)',
+        bordercolor: PLOT_GRID,
+        borderwidth: 1,
+        borderpad: 3,
         xanchor: 'left' as const,
       };
-      const layout: Partial<Plotly.Layout> = {
-        title: { text: t('plot.title') },
-        xaxis: { title: { text: t('plot.xAxis') }, scaleanchor: 'y', scaleratio: 1 },
-        yaxis: { title: { text: t('plot.yAxis') } },
-        margin: { t: 50, r: 20, b: 50, l: 60 },
-        showlegend: false,
+      const layoutUpdate = {
+        'xaxis.title.text': t('plot.xAxis'),
+        'yaxis.title.text': t('plot.yAxis'),
+        // Annotations is a whole-array replacement, so resupply every field.
         annotations: [
           {
             ...labelStyle,
             x: annoX,
-            y: h * 0.5,
+            y: subY,
             text: t('plot.substrateLabel', { er: epsilonR.toFixed(2) }),
           },
           {
             ...labelStyle,
             x: annoX,
-            y: h + tk + 0.5 * (yMax - h - tk),
+            y: airY,
             text: t('plot.airLabel'),
           },
         ],
-      };
-      void Plotly.react(node, traces, layout, { responsive: true, displaylogo: false });
+      } as unknown as Partial<Plotly.Layout>;
+      void Plotly.relayout(node, layoutUpdate);
+      // Colorbar title lives on the dummy heatmap trace at index N_BINS
+      // (see buildTraces — buckets are pushed first, then the heatmap).
+      const restyleUpdate = {
+        'colorbar.title.text': t('plot.colorbar'),
+      } as unknown as Partial<Plotly.PlotData>;
+      void Plotly.restyle(node, restyleUpdate, [N_BINS]);
     })();
     return () => {
       cancelled = true;
     };
-  }, [result, t]);
+  }, [t, result]);
 
   return (
-    <section className="cross-section-plot">
+    <section
+      className={`cross-section-plot${isLoading ? ' cross-section-plot--loading' : ''}`}
+    >
+      <h2>{t('plot.panelTitle')}</h2>
       <div ref={ref} className="cross-section-plot__canvas" />
+      {isLoading && (
+        <div className="cross-section-plot__loading-badge" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          {t('plot.working')}
+        </div>
+      )}
       {!result && <p className="hint cross-section-plot__hint">{t('plot.empty')}</p>}
     </section>
   );

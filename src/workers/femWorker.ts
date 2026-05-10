@@ -11,9 +11,21 @@
 import { hammerstadJensen } from '../analytical/hammerstad';
 import { wheeler } from '../analytical/wheeler';
 import { initMesh } from '../fem/mesh';
-import { solveMicrostrip } from '../fem/tlanalysis';
+import {
+  type AdaptivePassInfo,
+  type MicrostripSolveOptions,
+  type MicrostripSolveResult,
+  solveMicrostrip,
+  solveMicrostripAdaptive,
+} from '../fem/tlanalysis';
 import { findOptimalWidth } from '../optimization/bisection';
-import type { ProgressStage, WorkerRequest, WorkerResponse } from './messages';
+import type {
+  AdaptivePassUpdate,
+  ProgressStage,
+  WorkerRequest,
+  WorkerResponse,
+} from './messages';
+import type { MicrostripParams } from '../types';
 
 let initPromise: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
@@ -21,14 +33,58 @@ function ensureInit(): Promise<void> {
   return initPromise;
 }
 
-function post(message: WorkerResponse): void {
+function post(message: WorkerResponse, transfer?: Transferable[]): void {
   // The DedicatedWorkerGlobalScope.postMessage signature in lib.dom is fine
   // with arbitrary serialisable payloads.
-  (self as unknown as DedicatedWorkerGlobalScope).postMessage(message);
+  (self as unknown as DedicatedWorkerGlobalScope).postMessage(message, transfer ?? []);
 }
 
 function progress(id: number, stage: ProgressStage): void {
   post({ id, type: 'progress', stage });
+}
+
+/**
+ * Dispatch to the adaptive or fixed-mesh solver based on `options.adaptive`.
+ * Adaptive progress is streamed back via the `adaptive-pass` stage so the
+ * UI can show pass-by-pass convergence; per-pass mesh + φ are copied and
+ * **transferred** so the main thread receives ownership without a structured
+ * clone (~600 kB / pass on the FR-4 reference).
+ */
+function runSolve(
+  id: number,
+  params: MicrostripParams,
+  options: MicrostripSolveOptions | undefined,
+): MicrostripSolveResult {
+  if (options?.adaptive) {
+    return solveMicrostripAdaptive(
+      params,
+      options,
+      (info: AdaptivePassInfo, passResult: MicrostripSolveResult) => {
+        // Copy the mesh + φ buffers — the inner solveMicrostripAdaptive loop
+        // still needs the originals to compute the next pass's error
+        // indicator. Transferring the copies is free (no structured clone).
+        const verticesCopy = new Float64Array(passResult.mesh.vertices);
+        const trianglesCopy = new Int32Array(passResult.mesh.triangles);
+        const phiCopy = new Float64Array(passResult.phi);
+        const adaptive: AdaptivePassUpdate = {
+          pass: info.pass,
+          triangleCount: info.triangleCount,
+          z0: info.z0,
+          epsilonEff: info.epsilonEff,
+          deltaZ0: info.deltaZ0,
+          vertices: verticesCopy,
+          triangles: trianglesCopy,
+          phi: phiCopy,
+          bounds: { ...passResult.bounds },
+        };
+        post(
+          { id, type: 'progress', stage: 'adaptive-pass', adaptive },
+          [verticesCopy.buffer, trianglesCopy.buffer, phiCopy.buffer],
+        );
+      },
+    );
+  }
+  return solveMicrostrip(params, options);
 }
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>): Promise<void> => {
@@ -40,7 +96,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>): Promise<void> => {
 
     if (msg.type === 'forward') {
       progress(id, 'meshing-and-solving');
-      const fem = solveMicrostrip(msg.params, msg.options);
+      const fem = runSolve(id, msg.params, msg.options);
       const hj = hammerstadJensen(msg.params);
       const wh = wheeler(msg.params);
       post({
@@ -56,21 +112,24 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>): Promise<void> => {
 
     if (msg.type === 'findW') {
       progress(id, 'searching');
-      // Bisection probes don't need report-quality accuracy — just enough
-      // to pin down W. A ~5 k-triangle mesh during the search keeps each
-      // probe under ~50 ms, so the whole 8–9-iteration loop stays
-      // sub-second. The final solve below uses the user's chosen density.
+      // Probe at the same quality the user wants for the displayed
+      // result. Otherwise a coarse-mesh bisection lands on a W whose
+      // adaptive / dense-mesh Z₀ silently drifts outside the tolerance
+      // band the user just specified. `findOptimalWidth` returns the
+      // last probe's full MicrostripSolveResult, so we hand it straight
+      // to the UI — no redundant final solve.
+      const tolerancePct = msg.tolerancePct ?? 0.01;
       const searchOptions = {
-        solveOptions: {
-          geometry: { substrateMaxArea: 0.05, airMaxArea: 0.5 },
-        },
+        ...(msg.options !== undefined ? { solveOptions: msg.options } : {}),
+        ...(msg.frequencyGHz !== undefined ? { frequencyGHz: msg.frequencyGHz } : {}),
+        tolerancePct,
       };
       const opt = findOptimalWidth(msg.target, msg.fixed, searchOptions);
       const params = { ...msg.fixed, width: opt.width };
-      progress(id, 'meshing-and-solving');
-      const fem = solveMicrostrip(params, msg.options);
+      const fem = opt.lastResult;
       const hj = hammerstadJensen(params);
       const wh = wheeler(params);
+      const halfBand = msg.target * tolerancePct;
       post({
         id,
         type: 'findW-result',
@@ -79,6 +138,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>): Promise<void> => {
         wheeler: wh,
         paramsUsed: params,
         optimalW: opt.width,
+        targetBand: {
+          targetZ0: msg.target,
+          pct: tolerancePct,
+          low: msg.target - halfBand,
+          high: msg.target + halfBand,
+        },
       });
       return;
     }

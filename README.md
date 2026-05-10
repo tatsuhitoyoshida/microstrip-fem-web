@@ -42,7 +42,7 @@ by the regime the formula was fitted for.
 ## Quick start
 
 ```bash
-npm install
+npm install          # postinstall auto-installs the heap-growth triangle-wasm
 npm run dev          # Vite dev server on http://localhost:5173
 npm run test:run     # full Vitest suite
 npm run typecheck    # tsc -b --noEmit
@@ -51,6 +51,12 @@ npm run preview      # serve dist/ on http://localhost:4173
 ```
 
 Node.js v20 LTS or later is required.
+
+> `npm install` automatically swaps the upstream `triangle-wasm@1.0.0`
+> (16 MB heap, ~60 k triangle ceiling) for our rebuild with
+> `ALLOW_MEMORY_GROWTH=1`, lifting the ceiling to ~300 k. The hook is
+> `scripts/install-triangle-wasm.mjs`; you can re-run it manually with
+> `npm run install:triangle-wasm`. See `vendor/triangle-wasm/README.md`.
 
 ## Tech stack
 

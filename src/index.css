@@ -1,27 +1,45 @@
 :root {
-  /* Colour tokens — neutral defaults; Photonic Edge corporate palette to be
-     applied by Tatsy in a follow-up. */
-  --color-text: #1f2933;
-  --color-text-muted: #4b5563;
-  --color-text-heading: #0f172a;
-  --color-bg: #f8fafc;
-  --color-bg-panel: #ffffff;
-  --color-border: #e2e8f0;
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --color-error: #b91c1c;
-  --color-success: #15803d;
+  /* Photonic Edge dark palette — derived from the corporate slide master.
+     #0F1B2D is the slide-master navy; magenta #E91E8C and yellow #FFD300
+     are the brand accents that appear in the logo. */
+  --color-bg: #0f1b2d;
+  --color-bg-panel: #162639;
+  --color-bg-input: #1f2f44;
+  --color-bg-elevated: #1c2d44;
+  --color-border: #2c3e5a;
+  --color-border-strong: #3d5577;
 
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --color-text: #e7e6e6;
+  --color-text-muted: #9ba8bd;
+  --color-text-heading: #ffffff;
+
+  --color-accent: #4472c4;
+  --color-accent-hover: #5a86d4;
+  --color-accent-strong: #e91e8c;
+  --color-accent-strong-hover: #f23ea2;
+  --color-accent-warm: #ed7d31;
+  --color-accent-yellow: #ffd300;
+  --color-success: #70ad47;
+  --color-error: #ff6b6b;
+
+  /* Cross-section diagram colours (used by GeometryDiagram + Plotly heatmap). */
+  --color-conductor: #ed7d31;
+  --color-substrate: #4472c4;
+  --color-ground: #9ba8bd;
+
+  --font-sans:
+    'Calibri', 'Inter', '游ゴシック', 'Yu Gothic', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
   --font-mono: 'JetBrains Mono', 'Roboto Mono', ui-monospace, Consolas, monospace;
 
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px rgba(0, 0, 0, 0.35);
 
-  font: 16px/1.5 var(--font-sans);
+  font: 17px/1.5 var(--font-sans);
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
 }
 
 * {
@@ -31,6 +49,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--color-bg);
 }
 
 #root {
@@ -48,13 +67,14 @@ h3 {
 }
 
 h1 {
-  font-size: 1.75rem;
+  font-size: 2rem;
+  letter-spacing: 0.01em;
 }
 h2 {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 h3 {
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 p {
@@ -72,43 +92,64 @@ a:hover {
 button {
   font: inherit;
   cursor: pointer;
-  padding: 0.5rem 1rem;
+  padding: 0.55rem 1.1rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-bg-panel);
-  color: var(--color-text-heading);
+  color: var(--color-text);
   transition:
     background 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 button:hover:not(:disabled) {
   border-color: var(--color-accent);
+  color: var(--color-text-heading);
 }
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 button[type='submit'] {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
   color: white;
+  font-weight: 600;
 }
 button[type='submit']:hover:not(:disabled) {
-  background: var(--color-accent-hover);
+  background: var(--color-accent-strong-hover);
+  border-color: var(--color-accent-strong-hover);
 }
 
-input[type='number'] {
+input[type='number'],
+input[type='text'] {
   font: inherit;
   width: 100%;
-  padding: 0.4rem 0.5rem;
+  padding: 0.55rem 0.65rem;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 5px;
+  background: var(--color-bg-input);
+  color: var(--color-text);
   font-family: var(--font-mono);
 }
-input[type='number']:focus {
+input[type='number']:focus,
+input[type='text']:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: -1px;
   border-color: var(--color-accent);
+}
+input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+select {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-bg-input);
+  color: var(--color-text);
 }
 
 .numeric {
@@ -126,4 +167,9 @@ input[type='number']:focus {
 
 .loading {
   color: var(--color-text-muted);
+}
+
+::selection {
+  background: var(--color-accent-strong);
+  color: white;
 }

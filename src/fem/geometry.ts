@@ -30,6 +30,13 @@ export interface GeometryOptions {
   substrateMaxArea?: number;
   /** Per-region max triangle area for the air region. Default: heuristic. */
   airMaxArea?: number;
+  /**
+   * Extra Steiner points to insert into the PSLG before triangulation.
+   * Each entry is [x, y]; the marker is set to Interior so Triangle treats
+   * them as ordinary refinement seeds. Used by the adaptive loop to force
+   * refinement near elements with high error indicators.
+   */
+  extraPoints?: ReadonlyArray<readonly [number, number]>;
 }
 
 export interface BuiltGeometry {
@@ -113,6 +120,16 @@ export function buildMicrostripPslg(
   addSegment(cBR, cTR, Marker.Conductor); // right
   addSegment(cTR, cTL, Marker.Conductor); // top
   addSegment(cTL, cBL, Marker.Conductor); // left
+
+  // Adaptive refinement points: tag as Interior so Triangle treats them as
+  // ordinary Steiner seeds. They must lie strictly inside the substrate or
+  // air region (caller's responsibility — the adaptive selector enforces
+  // this via triangle-centroid sampling of the previous mesh).
+  if (options.extraPoints) {
+    for (const [px, py] of options.extraPoints) {
+      addPoint(px, py, Marker.Interior);
+    }
+  }
 
   // hole flood-fill seed inside the conductor (Triangle removes triangles
   // reachable from this point that are bounded by PSLG segments).
