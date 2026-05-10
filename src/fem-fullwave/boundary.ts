@@ -81,6 +81,38 @@ export function restrictToFree(A: CsrMatrix, partition: DirichletPartition): Csr
 }
 
 /**
+ * Extract the (rowFree × colFree) submatrix from a rectangular CSR.
+ * Drops any row whose index is fixed in `rowPartition` and any column
+ * whose index is fixed in `colPartition`. Useful for restricting
+ * non-square coupling blocks — e.g. the discrete-gradient operator
+ * `G` (numEdges × numNodes) to (numFreeEdges × numFreeNodes) when both
+ * boundary edges and boundary nodes are PEC-fixed in a closed waveguide.
+ *
+ * Symmetry isn't preserved here (the result needn't be square at all);
+ * use `restrictToFree` when both partitions are the same.
+ */
+export function restrictRect(
+  A: CsrMatrix,
+  rowPartition: DirichletPartition,
+  colPartition: DirichletPartition,
+): CsrMatrix {
+  const numFreeRows = rowPartition.freeIndices.length;
+  const numFreeCols = colPartition.freeIndices.length;
+  const builder = new CooBuilder(numFreeRows, numFreeCols);
+  for (let i = 0; i < A.numRows; i++) {
+    const fi = rowPartition.freeOf[i]!;
+    if (fi === -1) continue;
+    for (let k = A.rowPtr[i]!; k < A.rowPtr[i + 1]!; k++) {
+      const j = A.colIdx[k]!;
+      const fj = colPartition.freeOf[j]!;
+      if (fj === -1) continue;
+      builder.add(fi, fj, A.values[k]!);
+    }
+  }
+  return builder.toCsr();
+}
+
+/**
  * Scatter a free-DOF eigenvector back into a full-system vector. The
  * Dirichlet entries are filled with 0 (since that's the homogeneous BC
  * value).
