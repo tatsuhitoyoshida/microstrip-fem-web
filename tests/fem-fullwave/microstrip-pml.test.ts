@@ -24,6 +24,7 @@
 import path from 'node:path';
 import { describe, expect, it, beforeAll } from 'vitest';
 import { solveMicrostripPml } from '../../src/fem-fullwave/microstrip-pml';
+import { extractMicrostripZ0 } from '../../src/fem-fullwave/microstrip-z0';
 import { initMesh, _resetInitForTesting } from '../../src/fem/mesh';
 import { hammerstadJensen } from '../../src/analytical/hammerstad';
 import type { MicrostripParams } from '../../src/types';
@@ -97,14 +98,41 @@ describe('Microstrip PML pipeline — coarse FR-4 smoke test', () => {
     // and on FR-4 ε_eff_KJ ≈ 3.3, so β² is in (k₀², 5 · k₀²).
     expect(Math.abs(r.beta2.re)).toBeGreaterThan(0.5 * r.k0Squared);
     expect(Math.abs(r.beta2.re)).toBeLessThan(8 * r.k0Squared);
-    // The KJ seed is exposed in the result for diagnostics — log it
-    // so we can eyeball relative agreement.
+
+    // ε_eff(f) recovery + Z₀ via Power-Current.
+    const z = extractMicrostripZ0(r.mesh, r.topology, {
+      eFreeEdges: r.eFreeEdges,
+      eFreeNodes: r.eFreeNodes,
+      edgePartition: r.edgePartition,
+      nodePartition: r.nodePartition,
+      beta2: r.beta2,
+      k0Squared: r.k0Squared,
+      frequencyGHz: fGHz,
+      traceWidth: FR4.width,
+      substrateHeight: FR4.height,
+      conductorThickness: FR4.thickness,
+    });
     console.log(
       `  FR-4 PML 20GHz: β² = (${r.beta2.re.toExponential(3)} + ` +
         `${r.beta2.im.toExponential(3)}j),  k₀²·ε_eff_KJ = ` +
         `${(r.k0Squared * r.epsEffSeed).toExponential(3)},  ` +
         `outer iter ${r.outerIterations}, inner iter ${r.innerIterations}, ` +
-        `converged=${r.converged}`,
+        `converged=${r.converged}\n` +
+        `  ε_eff = ${z.epsilonEff.re.toFixed(3)} + ${z.epsilonEff.im.toExponential(2)}j,  ` +
+        `|V| = ${z.voltageMagnitude.toExponential(3)},  ` +
+        `Z₀(V-P) = ${z.z0.toFixed(2)} Ω,  ` +
+        `KJ static Z₀ ≈ ${hammerstadJensen(FR4).z0.toFixed(2)} Ω`,
     );
+
+    // ε_eff sanity: real part in [(εr+1)/2, εr] = [2.7, 4.4] for FR-4.
+    expect(z.epsilonEff.re).toBeGreaterThan((FR4.epsilonR + 1) / 2);
+    expect(z.epsilonEff.re).toBeLessThan(FR4.epsilonR);
+    // Z₀ should be in a sensible range. KJ static for these params
+    // is ≈ 49.8 Ω; full-wave at 20 GHz is similar order of magnitude.
+    // The coarse-mesh + approximate I extraction makes ±50 % the
+    // realistic tolerance here; tighter validation comes in
+    // Stage 3a-vi-d with finer meshing and proper boundary-loop I.
+    expect(z.z0).toBeGreaterThan(20);
+    expect(z.z0).toBeLessThan(150);
   }, 120_000); // 120 s timeout — coarse mesh keeps Schur fast, but the inner solve is the long pole.
 });
