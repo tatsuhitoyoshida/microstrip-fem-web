@@ -202,7 +202,7 @@ Phase 3 / 4 / 5 完了テストはコードと同居:
 
 ## 13. v0.2 — ベクトル全波固有値 FEM (experimental ページ)
 
-全波経路は `src/fem-fullwave/` 配下に存在し、「Full-wave
+全波経路は `research/src/fem-fullwave/` 配下に存在し、「Full-wave
 (experimental)」ページから到達できる。SC-PML 切り捨てを伴う
 マイクロストリップ断面の混合 (E_t, E_z) ベクトル Helmholtz 固有値
 問題を解き、複素伝搬定数 β² を Maxwell から直接復元する。end-to-end

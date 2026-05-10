@@ -15,14 +15,21 @@ before starting work.
 - HJ + Wheeler comparison panels
 - SweepChart with KJ-corrected Z₀(f) overlay
 
-## v0.2 — full-wave PML math (current)
+## v0.2 — full-wave PML math (shelved under `research/`)
 
 The whole vector-Helmholtz Nédélec + SC-PML pipeline lives under
-`src/fem-fullwave/`. It's reachable from the UI via the "Full-wave
-(experimental)" page (see `docs/architecture.md`), with a load-bearing
-disclaimer about its accuracy / convergence envelope.
+[`research/src/fem-fullwave/`](../research/). It was wired into the
+UI via a "Full-wave (experimental)" page during development but
+pulled before v0.2 release: ε_eff(FEM) matched KJ to better than
+0.3 % but absolute Z₀ on a UI-fast mesh sat ~30 % off, which would
+mislead users more than help them. The math, tests, and the UI
+scaffolding (page + hook + worker) are preserved so resuming
+development is a wire-up exercise, not a rebuild. See
+[`research/README.md`](../research/README.md) for the resume
+checklist; production scripts opt in via
+`npm run test:research` and `npm run typecheck:research`.
 
-What's in scope:
+What's *in* `research/`:
 
 - Real & complex sparse infrastructure (CSR, CooBuilder, BLAS-1)
 - MINRES (real symmetric indefinite) and Bi-CGSTAB (complex)
@@ -33,8 +40,11 @@ What's in scope:
 - SC-PML profile + tensor-weight derivation
 - End-to-end FR-4 dispersion validation: ε_eff(f) matches KJ
   within 0.3 % at f = 20 / 30 GHz
+- `FullWavePage` + `useFullWaveCalc` + a self-contained
+  `researchWorker` so the page works once it's re-imported into
+  `App.tsx`
 
-What's *not* in scope but **is on the v0.3 list below**:
+What's *not* in `research/` but **is on the v0.3 list below**:
 production-quality Z₀ extraction, low-frequency convergence, a
 stronger inner preconditioner, and the UI integration that would
 let the full-wave path replace the KJ post-process in the main

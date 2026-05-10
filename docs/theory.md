@@ -223,7 +223,7 @@ rather than replacing the v0.1 path.
 
 ## 13. v0.2 — full-wave eigenvalue FEM (experimental page)
 
-The full-wave path lives under `src/fem-fullwave/` and is reachable
+The full-wave path lives under `research/src/fem-fullwave/` and is reachable
 from the "Full-wave (experimental)" page. It solves the mixed
 (E_t, E_z) vector-Helmholtz eigenvalue problem on a microstrip
 cross-section with an SC-PML truncation, recovering the complex

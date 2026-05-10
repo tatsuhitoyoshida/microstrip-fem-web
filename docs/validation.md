@@ -87,7 +87,7 @@ truncation → complex shift-invert eigsolver) is fully wired up and
 validated end-to-end, but does not currently feed the production UI
 — see `docs/architecture.md` and `docs/roadmap.md` for why.
 
-### Closed-form validations (from `tests/fem-fullwave/`)
+### Closed-form validations (from `research/tests/fem-fullwave/`)
 
 | Test                                              | Reference                                        | Result          |
 | ------------------------------------------------- | ------------------------------------------------ | --------------- |

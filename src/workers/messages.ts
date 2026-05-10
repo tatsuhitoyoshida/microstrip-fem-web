@@ -57,19 +57,6 @@ export type WorkerRequest =
        * FEM. See `bisection.BisectionOptions.frequencyGHz` for details.
        */
       frequencyGHz?: number;
-    }
-  | {
-      id: number;
-      type: 'fullwave';
-      params: MicrostripParams;
-      /** Operating frequency in GHz. Must be ≥ ~20 GHz for the current
-       *  Jacobi-PCG inner solver to converge on a coarse mesh — see
-       *  `docs/validation.md` for the convergence floor. */
-      frequencyGHz: number;
-      /** Optional mesh / geometry override. The defaults match what
-       *  `microstrip-dispersion.test.ts` uses: lateral / air pad = 3·h,
-       *  ≈ few hundred triangles. */
-      coarseGeometry?: boolean;
     };
 
 export interface ForwardResultMessage {
@@ -93,43 +80,6 @@ export interface FindWResultMessage {
   targetBand: { targetZ0: number; pct: number; low: number; high: number };
 }
 
-/**
- * Full-wave PML eigenvalue result. Sent in reply to a `fullwave`
- * request. The eigenvalue β² is complex (im part ≈ radiation loss
- * absorbed by the PML), ε_eff is the dispersion-aware effective
- * permittivity, and Z₀ is the Voltage-Power characteristic
- * impedance — see `src/fem-fullwave/microstrip-z0.ts` for the
- * extraction details.
- *
- * `kjReferenceEpsEff` / `kjReferenceZ0` are the analytical
- * Kirschning–Jansen dispersion-corrected values at the same
- * frequency, surfaced alongside the FEM result so the UI can
- * present them side-by-side.
- */
-export interface FullWaveResultMessage {
-  id: number;
-  type: 'fullwave-result';
-  paramsUsed: MicrostripParams;
-  frequencyGHz: number;
-  /** β² in 1/mm² (complex). */
-  beta2: { re: number; im: number };
-  /** ε_eff(f) = β²/k₀² (complex). */
-  epsilonEff: { re: number; im: number };
-  /** Z₀ via the V-P definition [Ω]. */
-  z0: number;
-  /** KJ-dispersive ε_eff(f) at the same frequency (real reference). */
-  kjReferenceEpsEff: number;
-  /** KJ Z₀(f) at the same frequency [Ω]. */
-  kjReferenceZ0: number;
-  /** Outer / inner iteration counts for diagnostics. */
-  outerIterations: number;
-  innerIterations: number;
-  /** Whether the outer shift-invert reached its tolerance. */
-  converged: boolean;
-  /** Wall-clock time spent inside the worker, in milliseconds. */
-  elapsedMs: number;
-}
-
 export interface ProgressMessage {
   id: number;
   type: 'progress';
@@ -147,6 +97,5 @@ export interface ErrorMessage {
 export type WorkerResponse =
   | ForwardResultMessage
   | FindWResultMessage
-  | FullWaveResultMessage
   | ProgressMessage
   | ErrorMessage;

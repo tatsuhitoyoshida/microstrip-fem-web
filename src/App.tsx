@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CrossSectionPlot } from './components/CrossSectionPlot';
-import { FullWavePage } from './components/FullWavePage';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { ModeToggle, type UiMode } from './components/ModeToggle';
 import { type AdaptiveSettings, ParameterForm } from './components/ParameterForm';
@@ -15,8 +14,6 @@ import type { LengthUnit } from './lib/units';
 import type { MicrostripParams } from './types';
 import type { AdaptivePassUpdate } from './workers/messages';
 import './App.css';
-
-type TopLevelView = 'calculator' | 'fullwave';
 
 const MODE_STORAGE_KEY = 'microstrip-fem.ui-mode';
 
@@ -80,14 +77,6 @@ function App(): React.ReactElement {
     useMicrostripCalc();
   const [mode, setMode] = useState<UiMode>(() => loadInitialMode());
   /**
-   * Top-level view switch. The main calculator (KJ-corrected
-   * quasi-static FEM) is the trusted production path; the full-wave
-   * page is an experimental sister page that runs the new vector PML
-   * eigensolver. Keeping them on separate routes avoids confusing
-   * users with two different "Z₀" numbers in the same view.
-   */
-  const [view, setView] = useState<TopLevelView>('calculator');
-  /**
    * Operating frequency in GHz. Lives in App so it can be threaded into
    * ResultsPanel for λ_g / λ_0 post-processing — the FEM solver doesn't
    * use it (quasi-static), so it stays out of MicrostripParams.
@@ -120,29 +109,6 @@ function App(): React.ReactElement {
     return result;
   }, [selectedPassIndex, passPreviews, result, isLoading, lastParams]);
 
-  if (view === 'fullwave') {
-    return (
-      <div className="app app--fullwave">
-        <header className="app__header">
-          <a
-            className="app__brand-link"
-            href="https://www.photonic-edge.com/"
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t('app.brand')}
-          >
-            <img className="app__logo" src="/logo-wordmark.png" alt={t('app.brand')} />
-          </a>
-          <p className="app__title">{t('app.title')}</p>
-          <div className="app__header-controls">
-            <LanguageSwitcher />
-          </div>
-        </header>
-        <FullWavePage onBack={() => setView('calculator')} />
-      </div>
-    );
-  }
-
   return (
     <div className={`app app--${mode}`}>
       <header className="app__header">
@@ -157,13 +123,6 @@ function App(): React.ReactElement {
         </a>
         <p className="app__title">{t('app.title')}</p>
         <div className="app__header-controls">
-          <button
-            type="button"
-            className="app__nav-fullwave"
-            onClick={() => setView('fullwave')}
-          >
-            {t('app.gotoFullwave')}
-          </button>
           <ModeToggle value={mode} onChange={setMode} />
           <LanguageSwitcher />
         </div>

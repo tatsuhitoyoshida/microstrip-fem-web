@@ -1,17 +1,19 @@
 # microstrip-fem-web
 
-A finite-element method (FEM) solver for microstrip characteristic
+A 2-D finite-element method (FEM) solver for microstrip characteristic
 impedance Z₀, running entirely in the browser.
 
 > **Status**: v0.2 — quasi-static FEM + Kirschning–Jansen dispersion
-> correction is the production calculator (v0.1 path, validated within
-> 2 % of Hammerstad–Jensen). A research-grade vector full-wave
-> (Nédélec edge elements + SC-PML truncation) eigensolver also ships,
-> reachable from the **Full-wave (experimental)** page. Both math
-> pipelines are end-to-end tested; see
-> [`docs/roadmap.md`](docs/roadmap.md) for the gating work
-> (ILU(0) preconditioner, V-P quadrature) that would let the
-> full-wave path replace the KJ post-process in the main calculator.
+> correction is the production calculator (the v0.1 path, validated
+> within 2 % of Hammerstad–Jensen). A research-grade vector full-wave
+> (Nédélec edge elements + SC-PML truncation) eigensolver was built
+> alongside it but **shelved** for the v0.2 release — the math
+> pipeline checks out end-to-end against KJ for ε_eff, but absolute
+> Z₀ accuracy on a UI-fast mesh sits ~30 % off the reference until a
+> stronger preconditioner lands. The code, tests, and the experimental
+> UI page are preserved under [`research/`](research/) so development
+> can resume cleanly; the gating work is tracked in
+> [`docs/roadmap.md`](docs/roadmap.md).
 
 [日本語版 README](./README.ja.md)
 
@@ -25,8 +27,6 @@ the accuracy is governed by the mesh — which we control — rather than
 by the regime the formula was fitted for.
 
 ## Features
-
-### Main calculator (production, v0.1 + v0.2 KJ post-process)
 
 - 2-D quasi-static FEM with linear T3 elements, ~50 k triangles per
   solve by default
@@ -47,25 +47,19 @@ by the regime the formula was fitted for.
 - Bilingual UI (Japanese / English) with URL prefix-based language
   detection (`/ja/`, `/en/`)
 - All compute is offloaded to a Web Worker so the UI never blocks
-- Plotly is loaded lazily — initial JS payload is ~96 kB gzipped
+- Plotly is loaded lazily — initial JS payload is ~88 kB gzipped
 
-### Full-wave page (experimental, v0.2)
+### Shelved: experimental full-wave PML solver
 
-Available from the **Full-wave (experimental)** button in the header.
-Solves the vector-Helmholtz eigenvalue problem on the microstrip
-cross-section with an SC-PML truncation, recovering β² directly from
-Maxwell. End-to-end validated: ε_eff(FEM) matches the KJ-dispersive
-reference to within 0.3 % at f = 20 / 30 GHz on FR-4.
-
-- Mixed (E_t, E_z) Nédélec / nodal-Lagrange formulation
-- Stretched-coordinate PML for open-domain truncation
-- Complex symmetric Bi-CGSTAB inner solver + shift-invert outer eigsolver
-- ε_eff(f), Z₀ (V-P definition), β² shown side-by-side with KJ reference
-
-Not yet in the main calculator: the Jacobi-PCG inner solver stagnates
-below ~20 GHz, the V-P Z₀ extraction on the coarse mesh is ~30 % above
-KJ. See [`docs/roadmap.md`](docs/roadmap.md) for the gating work and
-[`docs/theory.md` §13](docs/theory.md) for the derivation.
+A complete vector-Helmholtz (Nédélec edge elements + SC-PML
+truncation) eigensolver was built but pulled from the v0.2 UI
+because absolute Z₀ accuracy on a UI-fast mesh wasn't trustworthy
+yet. The math is preserved in [`research/`](research/), with its
+own test suite (`npm run test:research`) and a dedicated
+[`research/README.md`](research/README.md) describing how to
+resume development. The derivation lives in
+[`docs/theory.md` §13](docs/theory.md); the gating items for
+production are in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Quick start
 

@@ -26,6 +26,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
+    "test:research": "vitest run --config vitest.research.config.ts",
+    "typecheck:research": "tsc -p tsconfig.research.json --noEmit",
     "postinstall": "node scripts/install-triangle-wasm.mjs",
     "install:triangle-wasm": "node scripts/install-triangle-wasm.mjs"
   },
