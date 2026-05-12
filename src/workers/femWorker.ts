@@ -29,7 +29,11 @@ import type { MicrostripParams } from '../types';
 
 let initPromise: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
-  if (!initPromise) initPromise = initMesh('/triangle.out.wasm');
+  // `import.meta.env.BASE_URL` resolves to whatever Vite's `base` is set to
+  // (e.g. `/microstrip-fem-web/` on GitHub Pages, `/` on a custom domain),
+  // so the WASM asset is fetched from the same prefix the page itself is
+  // served from. The trailing slash is guaranteed by Vite.
+  if (!initPromise) initPromise = initMesh(`${import.meta.env.BASE_URL}triangle.out.wasm`);
   return initPromise;
 }
 

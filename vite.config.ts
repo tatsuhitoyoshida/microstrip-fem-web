@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react';
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Serves the SPA from `https://tatsuhitoyoshida.github.io/microstrip-fem-web/`
+  // on GitHub Pages. Switch back to `'/'` once we point a custom apex
+  // domain (e.g. `tools.photonic-edge.com`) at the same Pages site.
+  base: '/microstrip-fem-web/',
   plugins: [react()],
   test: {
     environment: 'jsdom',
