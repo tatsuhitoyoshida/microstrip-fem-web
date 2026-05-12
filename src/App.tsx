@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CrossSectionPlot } from './components/CrossSectionPlot';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
@@ -6,6 +6,7 @@ import { ModeToggle, type UiMode } from './components/ModeToggle';
 import { type AdaptiveSettings, ParameterForm } from './components/ParameterForm';
 import { ResultsPanel } from './components/ResultsPanel';
 import { SweepChart } from './components/SweepChart';
+import { ToolNav } from './components/ToolNav';
 import { WhatIsThis } from './components/WhatIsThis';
 import type { MicrostripSolveOptions } from './fem/tlanalysis';
 import type { CalcResult } from './hooks/useMicrostripCalc';
@@ -14,6 +15,16 @@ import type { LengthUnit } from './lib/units';
 import type { MicrostripParams } from './types';
 import type { AdaptivePassUpdate } from './workers/messages';
 import './App.css';
+
+// Code-split the details/explainer page so its KaTeX dependency
+// (~98 kB gzipped JS + CSS) stays out of the main calculator bundle.
+// Vite emits a separate chunk that loads only when the user clicks
+// the "more details" link in the WhatIsThis banner.
+const DetailsPage = lazy(() =>
+  import('./components/DetailsPage').then((m) => ({ default: m.DetailsPage })),
+);
+
+type TopLevelView = 'calculator' | 'details';
 
 const MODE_STORAGE_KEY = 'microstrip-fem.ui-mode';
 
@@ -77,6 +88,16 @@ function App(): React.ReactElement {
     useMicrostripCalc();
   const [mode, setMode] = useState<UiMode>(() => loadInitialMode());
   /**
+   * Top-level view switch between the calculator and the in-app
+   * details/explainer page. State lives at the App level (rather than
+   * a router) because the rest of the app is already a single-page
+   * SPA and we only have one alternate view to host. Calculator
+   * state (`mode`, `frequency`, `result`, etc.) is intentionally not
+   * reset when toggling — coming back from `details` should land the
+   * user exactly where they left off.
+   */
+  const [view, setView] = useState<TopLevelView>('calculator');
+  /**
    * Operating frequency in GHz. Lives in App so it can be threaded into
    * ResultsPanel for λ_g / λ_0 post-processing — the FEM solver doesn't
    * use it (quasi-static), so it stays out of MicrostripParams.
@@ -109,6 +130,39 @@ function App(): React.ReactElement {
     return result;
   }, [selectedPassIndex, passPreviews, result, isLoading, lastParams]);
 
+  if (view === 'details') {
+    return (
+      <div className="app app--details">
+        <header className="app__header">
+          <a
+            className="app__brand-link"
+            href="https://www.photonic-edge.com/"
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t('app.brand')}
+          >
+            <img className="app__logo" src="/logo-wordmark.png" alt={t('app.brand')} />
+          </a>
+          <p className="app__title">{t('app.title')}</p>
+          <div className="app__header-controls">
+            <LanguageSwitcher />
+          </div>
+        </header>
+        <ToolNav
+          activeToolId="microstrip"
+          onSelectTool={(toolId) => {
+            if (toolId === 'microstrip') setView('calculator');
+          }}
+        />
+        <Suspense
+          fallback={<p className="app__lazy-fallback">{t('results.loading')}</p>}
+        >
+          <DetailsPage onBack={() => setView('calculator')} />
+        </Suspense>
+      </div>
+    );
+  }
+
   return (
     <div className={`app app--${mode}`}>
       <header className="app__header">
@@ -127,13 +181,19 @@ function App(): React.ReactElement {
           <LanguageSwitcher />
         </div>
       </header>
+      <ToolNav
+        activeToolId="microstrip"
+        onSelectTool={(toolId) => {
+          if (toolId === 'microstrip') setView('calculator');
+        }}
+      />
 
       <div className="app__content">
         <h1 className="app__tool-name">
           {t('app.toolNameMain')}
           <span className="app__tool-name__suffix"> {t('app.toolNameSuffix')}</span>
         </h1>
-        <WhatIsThis />
+        <WhatIsThis onShowDetails={() => setView('details')} />
 
         <main className="app__main">
         <aside className="app__form">

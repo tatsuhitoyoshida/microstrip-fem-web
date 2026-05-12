@@ -5,17 +5,23 @@
  *
  * Spans the same `max-width` as `.app__main` (1400px) so it visually lines
  * up with the parameters / heatmap row below.
+ *
+ * The "more details" trigger used to open the GitHub README in a new tab
+ * (placeholder while the in-app explainer was missing). It now navigates
+ * to the in-app `DetailsPage` via the `onShowDetails` callback the parent
+ * provides — so we render it as a button styled like a link rather than
+ * an `<a>` element.
  */
 
 import { Trans, useTranslation } from 'react-i18next';
 
-// TODO: replace with the future detail page (e.g. `/docs`) once Tatsy
-// publishes it. Pointing at the GitHub repo's README in the meantime —
-// it carries the most detailed theory / validation content we currently
-// have, and clicking it doesn't 404.
-const DETAIL_LINK_HREF = 'https://github.com/photonic-edge/microstrip-fem-web#readme';
+export interface WhatIsThisProps {
+  /** Open the in-app details / explainer page. Wired in `App.tsx` to
+   *  switch the top-level `view` state to `'details'`. */
+  onShowDetails: () => void;
+}
 
-export function WhatIsThis(): React.ReactElement {
+export function WhatIsThis(props: WhatIsThisProps): React.ReactElement {
   const { t } = useTranslation();
   return (
     <section className="what-is-this" aria-label={t('whatIs.title')}>
@@ -31,11 +37,10 @@ export function WhatIsThis(): React.ReactElement {
             // Trans parser otherwise gets confused. Hence `detail` rather
             // than `link` (HTML <link> is a stylesheet element).
             detail: (
-              <a
+              <button
+                type="button"
                 className="what-is-this__detail-link"
-                href={DETAIL_LINK_HREF}
-                target="_blank"
-                rel="noreferrer"
+                onClick={props.onShowDetails}
               />
             ),
           }}

@@ -9,5 +9,10 @@ export default defineConfig({
     globals: true,
     setupFiles: './tests/setup.ts',
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
+    // FEM tests legitimately take 6–17 s under parallel-worker CPU
+    // contention; the default 5 s makes them flake. Single-test wall
+    // clock peaks around 17 s on FR-4 + Duroid (microstrip.test.ts), so
+    // 30 s leaves enough margin without masking a real regression.
+    testTimeout: 30000,
   },
 });
