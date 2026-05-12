@@ -141,7 +141,11 @@ function App(): React.ReactElement {
             rel="noreferrer"
             aria-label={t('app.brand')}
           >
-            <img className="app__logo" src="/logo-wordmark.png" alt={t('app.brand')} />
+            <img
+              className="app__logo"
+              src={`${import.meta.env.BASE_URL}logo-wordmark.png`}
+              alt={t('app.brand')}
+            />
           </a>
           <p className="app__title">{t('app.title')}</p>
           <div className="app__header-controls">
@@ -173,7 +177,11 @@ function App(): React.ReactElement {
           rel="noreferrer"
           aria-label={t('app.brand')}
         >
-          <img className="app__logo" src="/logo-wordmark.png" alt={t('app.brand')} />
+          <img
+              className="app__logo"
+              src={`${import.meta.env.BASE_URL}logo-wordmark.png`}
+              alt={t('app.brand')}
+            />
         </a>
         <p className="app__title">{t('app.title')}</p>
         <div className="app__header-controls">
