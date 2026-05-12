@@ -8,6 +8,18 @@ export default defineConfig({
   // domain (e.g. `tools.photonic-edge.com`) at the same Pages site.
   base: '/microstrip-fem-web/',
   plugins: [react()],
+  build: {
+    // Vite 8's default Rolldown/OXC minify corrupts lone-surrogate
+    // \uD800-\uDFFF escapes (used by KaTeX 0.16.x's Lexer regex) into
+    // U+FFFD, which silently breaks parsing of every `\<letter>` macro —
+    // \varepsilon collapses to \v, \frac to \f, etc. Terser preserves
+    // the original escape sequences and produces an ASCII-safe output
+    // without that destructive UTF-8 round-trip.
+    minify: 'terser',
+    terserOptions: {
+      format: { ascii_only: true },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
